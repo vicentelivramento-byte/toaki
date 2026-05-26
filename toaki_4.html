@@ -665,9 +665,12 @@
     if (selectedIds.size === 0 || !userLat) return;
 
     const msg = document.getElementById('msgInput').value.trim();
-    const mapsLink = `https://maps.google.com/?ll=${userLat},${userLon}&q=${userLat},${userLon}`;
+    const baseUrl = 'https://vicentelivramento-byte.github.io/toaki/';
+    const nome = encodeURIComponent('Vicente');
+    const ts = Date.now();
+    const viewUrl = `${baseUrl}toaki_view.html?lat=${userLat}&lon=${userLon}&nome=${nome}&ts=${ts}${msg ? '&msg=' + encodeURIComponent(msg) : ''}`;
     
-    let text = `📍 *TÔAKI* — Estou aqui!\n${mapsLink}`;
+    `📍 *TÔAKI* — Estou aqui!\nClica para ver onde estou:\n${viewUrl}`
     if (msg) text += `\n\n💬 ${msg}`;
 
     const selected = contacts.filter(c => selectedIds.has(c.id));
