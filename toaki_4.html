@@ -628,7 +628,8 @@
       return;
     }
 
-    navigator.geolocation.getCurrentPosition(
+    // Watch position atualiza continuamente
+    navigator.geolocation.watchPosition(
       pos => {
         userLat = pos.coords.latitude;
         userLon = pos.coords.longitude;
@@ -641,7 +642,7 @@
             <span style="color:var(--red);text-align:center;padding:20px">Permissão de localização negada.<br>Ativa nas definições do browser.</span>
           </div>`;
       },
-      { enableHighAccuracy: true, timeout: 10000 }
+      { enableHighAccuracy: true, timeout: 10000, maximumAge: 0 }
     );
   }
 
