@@ -665,23 +665,22 @@
     if (selectedIds.size === 0 || !userLat) return;
 
     const msg = document.getElementById('msgInput').value.trim();
-    const mapsLink = `https://maps.google.com/?q=${userLat},${userLon}`;
-    const place = document.getElementById('locationText').textContent;
+    const mapsLink = `https://maps.google.com/?ll=${userLat},${userLon}&q=${userLat},${userLon}`;
     
-    let text = `📍 *TÔAKI* — Estou aqui!\n${place}\n${mapsLink}`;
+    let text = `📍 *TÔAKI* — Estou aqui!\n${mapsLink}`;
     if (msg) text += `\n\n💬 ${msg}`;
 
     const selected = contacts.filter(c => selectedIds.has(c.id));
-    
-    // Abre WhatsApp para cada contacto selecionado
-    selected.forEach((c, i) => {
-      setTimeout(() => {
-        const waUrl = `https://wa.me/${c.phone}?text=${encodeURIComponent(text)}`;
-        window.open(waUrl, '_blank');
-      }, i * 800);
-    });
 
-    showToast(`✓ A abrir WhatsApp para ${selected.length} contacto${selected.length > 1 ? 's' : ''}!`, 'success');
+    if (selected.length === 1) {
+      const waUrl = `https://wa.me/${selected[0].phone}?text=${encodeURIComponent(text)}`;
+      window.location.href = waUrl;
+    } else {
+      const waUrl = `https://wa.me/?text=${encodeURIComponent(text)}`;
+      window.location.href = waUrl;
+    }
+
+    showToast(`✓ A abrir WhatsApp!`, 'success');
   }
 
   // ADICIONAR CONTACTO
