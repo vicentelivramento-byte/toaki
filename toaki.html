@@ -277,7 +277,7 @@
 
   async function uploadToImgBB(base64) {
     try {
-      const base64Data = base64.split(',')[1];
+      const base64Data = base64.split(',')[1].replace(/\s/g, '');
       const url = `https://api.imgbb.com/1/upload?key=${IMGBB_KEY}`;
       const formData = new FormData();
       formData.append('image', base64Data);
