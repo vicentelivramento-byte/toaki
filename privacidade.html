@@ -1,0 +1,94 @@
+<!DOCTYPE html>
+<html lang="pt">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Política de Privacidade — TÔAKI</title>
+  <link href="https://fonts.googleapis.com/css2?family=Syne:wght@700;800&family=DM+Sans:wght@300;400;500&display=swap" rel="stylesheet">
+  <style>
+    :root { --red:#E8392A; --dark:#111110; --surface:#1A1A18; --border:rgba(255,255,255,0.08); --text:#F5F4F0; --muted:#888884; }
+    * { box-sizing:border-box; margin:0; padding:0; }
+    body { background:var(--dark); color:var(--text); font-family:'DM Sans',sans-serif; font-size:16px; line-height:1.7; }
+    nav { display:flex; align-items:center; justify-content:space-between; padding:20px 40px; border-bottom:1px solid var(--border); }
+    .nav-logo { font-family:'Syne',sans-serif; font-weight:800; font-size:20px; letter-spacing:0.08em; text-decoration:none; color:var(--text); display:flex; align-items:center; gap:6px; }
+    .nav-dot { width:7px; height:7px; background:var(--red); border-radius:50%; }
+    main { max-width:720px; margin:0 auto; padding:64px 24px 100px; }
+    h1 { font-family:'Syne',sans-serif; font-weight:800; font-size:36px; margin-bottom:8px; }
+    .meta { font-size:13px; color:var(--muted); margin-bottom:48px; }
+    h2 { font-family:'Syne',sans-serif; font-weight:700; font-size:20px; margin:40px 0 12px; }
+    p { margin-bottom:16px; color:rgba(245,244,240,0.85); }
+    ul { padding-left:20px; margin-bottom:16px; }
+    ul li { margin-bottom:8px; color:rgba(245,244,240,0.85); }
+    a { color:var(--red); }
+    table { width:100%; border-collapse:collapse; margin-bottom:24px; font-size:14px; }
+    th { text-align:left; padding:10px 12px; background:var(--surface); color:var(--muted); font-weight:500; font-size:12px; text-transform:uppercase; letter-spacing:0.08em; }
+    td { padding:10px 12px; border-bottom:1px solid var(--border); color:rgba(245,244,240,0.85); }
+    .back { font-size:13px; color:var(--muted); text-decoration:none; display:inline-flex; align-items:center; gap:6px; margin-top:48px; }
+    .back:hover { color:var(--text); }
+  </style>
+</head>
+<body>
+<nav>
+  <a href="index.html" class="nav-logo">TÔAKI <div class="nav-dot"></div></a>
+</nav>
+<main>
+  <h1>Política de Privacidade</h1>
+  <p class="meta">Última atualização: maio de 2026 · Conforme o RGPD (Regulamento Geral sobre a Proteção de Dados)</p>
+
+  <h2>1. Responsável pelo Tratamento</h2>
+  <p>O responsável pelo tratamento dos dados pessoais recolhidos através do TÔAKI é Vicente Faria, contactável através de <a href="mailto:vicente.faria@sapo.pt">vicente.faria@sapo.pt</a>.</p>
+
+  <h2>2. Dados Recolhidos</h2>
+  <table>
+    <tr><th>Dado</th><th>Finalidade</th><th>Base Legal</th></tr>
+    <tr><td>Nome</td><td>Identificação na app</td><td>Execução do contrato</td></tr>
+    <tr><td>E-mail</td><td>Autenticação e comunicações</td><td>Execução do contrato</td></tr>
+    <tr><td>Número de telemóvel</td><td>Envio de notificações push</td><td>Consentimento</td></tr>
+    <tr><td>Localização GPS</td><td>Partilha voluntária de localização</td><td>Consentimento</td></tr>
+    <tr><td>Fotografias</td><td>Partilha voluntária com contactos</td><td>Consentimento</td></tr>
+    <tr><td>Histórico de envios</td><td>Consulta do utilizador</td><td>Execução do contrato</td></tr>
+  </table>
+
+  <h2>3. Localização GPS</h2>
+  <p>A localização geográfica só é acedida e partilhada quando o utilizador inicia explicitamente um envio. O TÔAKI <strong>não</strong> recolhe localização em segundo plano nem realiza rastreamento contínuo.</p>
+
+  <h2>4. Notificações Push</h2>
+  <p>As subscrições de notificações push são voluntárias. O número de telemóvel associado à subscrição é utilizado exclusivamente para entregar notificações de localização enviadas por outros utilizadores.</p>
+
+  <h2>5. Partilha de Dados com Terceiros</h2>
+  <p>Os dados são tratados com recurso aos seguintes subcontratantes:</p>
+  <ul>
+    <li><strong>Supabase</strong> — autenticação, base de dados e armazenamento de fotografias (servidores na União Europeia);</li>
+    <li><strong>Google Firebase Cloud Messaging</strong> — entrega de notificações push;</li>
+    <li><strong>OpenStreetMap</strong> — visualização de mapas (sem transferência de dados pessoais).</li>
+  </ul>
+  <p>Não vendemos nem cedemos dados pessoais a terceiros para fins comerciais.</p>
+
+  <h2>6. Conservação dos Dados</h2>
+  <p>Os dados são conservados enquanto a conta estiver ativa. As fotografias partilhadas são eliminadas automaticamente após 90 dias. O histórico de envios é conservado por 12 meses.</p>
+
+  <h2>7. Direitos do Utilizador</h2>
+  <p>Ao abrigo do RGPD, tens os seguintes direitos:</p>
+  <ul>
+    <li><strong>Acesso</strong> — solicitar uma cópia dos teus dados;</li>
+    <li><strong>Retificação</strong> — corrigir dados incorretos;</li>
+    <li><strong>Eliminação</strong> — solicitar a eliminação da conta e dados;</li>
+    <li><strong>Portabilidade</strong> — receber os dados em formato legível por máquina;</li>
+    <li><strong>Oposição</strong> — opor-te a determinados tratamentos;</li>
+    <li><strong>Retirar consentimento</strong> — a qualquer momento, para tratamentos baseados em consentimento.</li>
+  </ul>
+  <p>Para exercer qualquer destes direitos, contacta <a href="mailto:vicente.faria@sapo.pt">vicente.faria@sapo.pt</a>. Tens também o direito de apresentar reclamação à <a href="https://www.cnpd.pt" target="_blank">CNPD</a> (Comissão Nacional de Proteção de Dados).</p>
+
+  <h2>8. Segurança</h2>
+  <p>Adotamos medidas técnicas e organizativas adequadas para proteger os dados pessoais contra acesso não autorizado, perda ou divulgação, incluindo encriptação em trânsito (HTTPS) e autenticação segura.</p>
+
+  <h2>9. Cookies</h2>
+  <p>O TÔAKI utiliza apenas armazenamento local (localStorage) para manter a sessão do utilizador. Não utilizamos cookies de rastreamento ou publicidade.</p>
+
+  <h2>10. Alterações a esta Política</h2>
+  <p>Alterações significativas serão comunicadas por e-mail com pelo menos 30 dias de antecedência.</p>
+
+  <a href="index.html" class="back">← Voltar ao TÔAKI</a>
+</main>
+</body>
+</html>
