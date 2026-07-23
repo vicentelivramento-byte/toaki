@@ -1454,6 +1454,18 @@
   // configura aqui as instrucoes de pagamento MB WAY (numero/chave a preencher)
   const MBWAY_INFO = 'PREENCHER: numero MB WAY';
 
+  // Formata valores: 20 -> "20" | 1.5 -> "1,5" | 2.25 -> "2,25"
+  function progFmt(v) {
+    const n = Number(v || 0);
+    if (!isFinite(n)) return '0';
+    const txt = (Math.round(n * 100) / 100).toFixed(2).replace(/\.?0+$/, '');
+    return txt.replace('.', ',');
+  }
+  // Le numeros aceitando virgula decimal (formato PT)
+  function progNum(txt) {
+    return parseFloat(String(txt || '').trim().replace(',', '.'));
+  }
+
   function renderProg() {
     const bInput = document.getElementById('progBusca'); if (bInput) progBuscaTxt = bInput.value;
     const box = document.getElementById('progScreen');
@@ -1501,14 +1513,14 @@
     const myPhone = progMyPhone();
     const minhasAqui = progMinhas.filter(p => p.grupo_id === grupoId);
     const meusCreditos = minhasAqui.reduce((a, p) => a + Number(p.creditos || 0), 0);
-    const hodeTxt = (g.hode_min != null) ? (' &middot; hode ' + Number(g.hode_min).toFixed(0) + '\u2013' + Number(g.hode_max).toFixed(0) + '\u20AC') : '';
+    const hodeTxt = (g.hode_min != null) ? (' &middot; hode ' + progFmt(g.hode_min) + '\u2013' + progFmt(g.hode_max) + '\u20AC') : '';
     const nOcup = Object.keys(ocupadas).length;
     let h = '<div class="prog-card"><div class="prog-card-title">' + g.nome + '</div>' +
-            '<div class="prog-sub">' + nOcup + '/8 posicoes &middot; ' + Number(g.creditos).toFixed(0) + ' creditos' + hodeTxt + '</div>';
+            '<div class="prog-sub">' + nOcup + '/8 posicoes &middot; ' + progFmt(g.creditos) + ' creditos' + hodeTxt + '</div>';
     if (minhasAqui.length) {
       h += '<div class="prog-badges">' +
              '<div class="prog-badge"><div class="prog-badge-val">' + minhasAqui.length + '</div><div class="prog-badge-lbl">Minhas posicoes</div></div>' +
-             '<div class="prog-badge"><div class="prog-badge-val">' + meusCreditos.toFixed(0) + '</div><div class="prog-badge-lbl">Os meus creditos</div></div>' +
+             '<div class="prog-badge"><div class="prog-badge-val">' + progFmt(meusCreditos) + '</div><div class="prog-badge-lbl">Os meus creditos</div></div>' +
            '</div>';
     }
     for (let i = 1; i <= 8; i++) {
@@ -1550,13 +1562,13 @@
     if (!progHodes.length) h += '<div class="prog-sub">Sem intervalos. Cria o primeiro.</div>';
     progHodes.forEach(hd => {
       h += '<div class="prog-pos" style="margin-top:8px">' +
-             '<div class="prog-pos-name">' + Number(hd.min_val).toFixed(0) + '\u2013' + Number(hd.max_val).toFixed(0) + '\u20AC</div>' +
+             '<div class="prog-pos-name">' + progFmt(hd.min_val) + '\u2013' + progFmt(hd.max_val) + '\u20AC</div>' +
              '<div class="place-del" onclick="progRemoverHode(' + hd.id + ')">\u00D7</div>' +
            '</div>';
     });
     h += '<div style="display:flex;gap:8px;margin-top:10px">' +
-           '<input class="place-input" id="hodeMin" type="number" placeholder="Min" style="margin-bottom:0">' +
-           '<input class="place-input" id="hodeMax" type="number" placeholder="Max" style="margin-bottom:0">' +
+           '<input class="place-input" id="hodeMin" type="text" inputmode="decimal" placeholder="Min" style="margin-bottom:0">' +
+           '<input class="place-input" id="hodeMax" type="text" inputmode="decimal" placeholder="Max" style="margin-bottom:0">' +
            '<button class="prog-btn-sm" onclick="progAddHode()">Add</button>' +
          '</div>';
     h += '</div>';
@@ -1579,10 +1591,10 @@
 
   function progAbrirCriar() {
     if (!progHodes.length) { showToast('Ainda nao ha intervalos de hode definidos.', 'error'); return; }
-    const opts = progHodes.map(h => Number(h.min_val).toFixed(0) + '-' + Number(h.max_val).toFixed(0) + ' EUR').join('\n');
+    const opts = progHodes.map(h => progFmt(h.min_val) + '-' + progFmt(h.max_val) + ' EUR').join('\n');
     const nome = prompt('Nome da lista:');
     if (nome === null || !nome.trim()) return;
-    let idx = prompt('Escolhe o intervalo de hode (escreve o numero):\n\n' + progHodes.map((h,i) => (i+1) + ') ' + Number(h.min_val).toFixed(0) + '-' + Number(h.max_val).toFixed(0) + ' EUR').join('\n'));
+    let idx = prompt('Escolhe o intervalo de hode (escreve o numero):\n\n' + progHodes.map((h,i) => (i+1) + ') ' + progFmt(h.min_val) + '-' + progFmt(h.max_val) + ' EUR').join('\n'));
     idx = parseInt(idx, 10);
     if (!idx || idx < 1 || idx > progHodes.length) { showToast('Intervalo invalido.', 'error'); return; }
     progCriarGrupo(nome.trim(), progHodes[idx-1].id);
@@ -1600,8 +1612,8 @@
     } catch (e) { showToast('Erro de ligacao.', 'error'); }
   }
   async function progAddHode() {
-    const mn = parseFloat(document.getElementById('hodeMin').value);
-    const mx = parseFloat(document.getElementById('hodeMax').value);
+    const mn = progNum(document.getElementById('hodeMin').value);
+    const mx = progNum(document.getElementById('hodeMax').value);
     if (isNaN(mn) || isNaN(mx) || mx < mn) { showToast('Intervalo invalido.', 'error'); return; }
     try {
       const res = await fetch(SUPABASE_URL + '/rest/v1/prog_hodes', {
