@@ -77,6 +77,22 @@
     .prog-btn-sm { padding: 8px 14px; background: var(--red); border: none; border-radius: 10px; color: #fff; font-family: 'Syne', sans-serif; font-size: 12px; font-weight: 700; cursor: pointer; }
     .prog-admin { border-color: rgba(46,204,113,0.3); background: rgba(46,204,113,0.05); }
     .prog-empty { text-align: center; padding: 40px 20px; color: var(--muted); font-size: 13px; }
+    .prog-ov { display: none; position: fixed; inset: 0; background: var(--dark); z-index: 600; overflow-y: auto; }
+    .prog-ov.open { display: block; }
+    .prog-ov-head { position: sticky; top: 0; background: var(--dark); border-bottom: 1px solid var(--border); padding: 16px; display: flex; align-items: center; gap: 12px; z-index: 2; }
+    .prog-ov-title { font-family: 'Syne', sans-serif; font-size: 17px; font-weight: 800; flex: 1; }
+    .prog-ov-close { background: transparent; border: 1px solid var(--border); color: var(--text); border-radius: 10px; width: 34px; height: 34px; font-size: 16px; cursor: pointer; }
+    .prog-ov-body { padding: 16px; }
+    .prog-row { border: 1px solid var(--border); border-radius: 12px; padding: 12px; margin-bottom: 10px; background: var(--surface); }
+    .prog-row.eu { border-color: var(--red); background: rgba(232,57,42,0.05); }
+    .prog-row-top { display: flex; align-items: center; gap: 10px; margin-bottom: 10px; }
+    .prog-row-name { flex: 1; font-size: 13px; font-weight: 600; }
+    .prog-in { width: 100%; background: var(--mid); border: 1px solid var(--border); border-radius: 9px; padding: 10px; color: var(--text); font-family: 'DM Sans', sans-serif; font-size: 13px; outline: none; margin-bottom: 8px; }
+    .prog-in:disabled { opacity: 0.55; }
+    .prog-in-row { display: flex; gap: 8px; }
+    .prog-tag-open { font-size: 10px; text-transform: uppercase; letter-spacing: 0.06em; color: #2ECC71; }
+    .prog-fecho { font-size: 12px; color: var(--muted); margin-bottom: 12px; }
+    .prog-fecho.fechada { color: var(--red); }
 
     /* HISTÓRICO */
     #historyScreen { display: none; flex-direction: column; padding-bottom: 32px; }
@@ -470,6 +486,19 @@
     <div id="placePicked" style="display:none;font-size:13px;color:#2ECC71;margin-bottom:10px"></div>
     <button class="modal-btn" id="savePlaceBtn" onclick="saveNewPlace()" disabled style="opacity:0.5">Guardar local</button>
     <button class="modal-btn-cancel" onclick="closeAddPlace()">Cancelar</button>
+  </div>
+</div>
+
+<div class="prog-ov" id="prognosticosOverlay">
+  <div class="prog-ov-head">
+    <button class="prog-ov-close" onclick="progFecharPrognosticos()">&#10005;</button>
+    <div class="prog-ov-title" id="progListaTitulo">Lista</div>
+  </div>
+  <div class="prog-ov-body">
+    <div class="section-label" style="margin-bottom:6px">Data da lista</div>
+    <input class="place-input" type="date" id="progDataInput" onchange="progCarregarDia()">
+    <div class="prog-fecho" id="progFechoInfo"></div>
+    <div id="progListaBody"></div>
   </div>
 </div>
 
@@ -1563,6 +1592,9 @@
              '<div class="prog-pos-name" style="color:var(--muted)">Livre</div></div>';
       }
     }
+    if (minhasAqui.some(p => p.estado === 'aceite')) {
+      h += '<button class="prog-btn" onclick="progAbrirPrognosticos(' + grupoId + ')">Prognosticos</button>';
+    }
     if (souDono && nOcup < 8) {
       h += '<button class="prog-btn" style="background:#25D366" onclick="progPartilhar(' + grupoId + ')">Convidar por WhatsApp</button>';
     }
@@ -1579,6 +1611,120 @@
                 'Valor da hode: ' + progFmt(g.hode_min) + '\u2013' + progFmt(g.hode_max) + '\u20AC\n\n' +
                 'Escolhe a tua posição aqui: ' + url;
     window.open('https://wa.me/?text=' + encodeURIComponent(txt), '_blank');
+  }
+
+  // ===== LISTAS DIARIAS DE PROGNOSTICOS =====
+  let progListaGrupo = null, progListaId = null, progListaRows = [], progListaFechada = false;
+
+  function progAbrirPrognosticos(grupoId) {
+    progListaGrupo = grupoId;
+    const g = progGrupos.find(x => x.id === grupoId);
+    document.getElementById('progListaTitulo').textContent = g ? g.nome : 'Lista';
+    const hoje = new Date();
+    const iso = new Date(hoje.getTime() - hoje.getTimezoneOffset() * 60000).toISOString().slice(0, 10);
+    document.getElementById('progDataInput').value = iso;
+    document.getElementById('prognosticosOverlay').classList.add('open');
+    progCarregarDia();
+  }
+  function progFecharPrognosticos() {
+    document.getElementById('prognosticosOverlay').classList.remove('open');
+  }
+
+  async function progCarregarDia() {
+    const data = document.getElementById('progDataInput').value;
+    const body = document.getElementById('progListaBody');
+    if (!data || !progListaGrupo) return;
+    body.innerHTML = '<div class="prog-empty"><div class="spinner"></div></div>';
+    try {
+      const r = await fetch(SUPABASE_URL + '/rest/v1/rpc/prog_criar_lista', {
+        method: 'POST', headers: progHeaders(),
+        body: JSON.stringify({ p_grupo: progListaGrupo, p_data: data })
+      });
+      if (!r.ok) { body.innerHTML = '<div class="prog-empty">Erro ao abrir a lista do dia.</div>'; return; }
+      progListaId = await r.json();
+
+      const [info, rows] = await Promise.all([
+        fetch(SUPABASE_URL + '/rest/v1/prog_listas?id=eq.' + progListaId + '&select=*', { headers: progHeaders() }).then(x => x.json()),
+        fetch(SUPABASE_URL + '/rest/v1/prog_prognosticos?lista_id=eq.' + progListaId + '&order=posicao.asc&select=*', { headers: progHeaders() }).then(x => x.json())
+      ]);
+      progListaRows = Array.isArray(rows) ? rows : [];
+      const fecha = (Array.isArray(info) && info[0]) ? info[0].fecha_em : null;
+      progListaFechada = fecha ? (new Date(fecha) <= new Date()) : false;
+      const el = document.getElementById('progFechoInfo');
+      if (fecha) {
+        const d = new Date(fecha);
+        const txt = d.toLocaleDateString('pt-PT') + ' as ' + d.toLocaleTimeString('pt-PT', { hour: '2-digit', minute: '2-digit' });
+        el.textContent = progListaFechada ? 'Lista fechada desde ' + txt : 'Fecha a ' + txt;
+        el.className = 'prog-fecho' + (progListaFechada ? ' fechada' : '');
+      } else { el.textContent = ''; }
+      progRenderDia();
+    } catch (e) {
+      body.innerHTML = '<div class="prog-empty">Erro de ligacao.</div>';
+    }
+  }
+
+  function progRenderDia() {
+    const myPhone = progMyPhone();
+    const souAceite = progParts.some(p => p.grupo_id === progListaGrupo && normalizePhone(p.phone) === myPhone && p.estado === 'aceite');
+    let html = '';
+    for (let i = 1; i <= 8; i++) {
+      const row = progListaRows.find(r => r.posicao === i) || { posicao: i };
+      const part = progParts.find(p => p.grupo_id === progListaGrupo && p.posicao === i && p.estado === 'aceite');
+      const euDono = part && normalizePhone(part.phone) === myPhone;
+      const editavel = souAceite && !progListaFechada && (euDono || row.aberta === true);
+      const dis = editavel ? '' : ' disabled';
+      html += '<div class="prog-row' + (euDono ? ' eu' : '') + '">' +
+        '<div class="prog-row-top">' +
+          '<div class="prog-pos-num">' + i + '</div>' +
+          '<div class="prog-row-name">' + (part ? part.nome : '<span style="color:var(--muted)">Posicao livre</span>') +
+            (row.aberta ? ' <span class="prog-tag-open">aberta</span>' : '') + '</div>' +
+        '</div>' +
+        '<input class="prog-in" id="pc_' + i + '" placeholder="Codigo do jogo" value="' + (row.codigo_jogo || '') + '"' + dis + '>' +
+        '<input class="prog-in" id="pp_' + i + '" placeholder="Prognostico" value="' + (row.prognostico || '') + '"' + dis + '>' +
+        '<div class="prog-in-row">' +
+          '<input class="prog-in" id="pv_' + i + '" inputmode="decimal" placeholder="Valor" value="' + (row.valor != null ? progFmt(row.valor) : '') + '"' + dis + '>' +
+          (editavel ? '<button class="prog-btn-sm" style="height:38px" onclick="progGuardarLinha(' + i + ')">Guardar</button>' : '') +
+        '</div>' +
+        (euDono && !progListaFechada
+          ? '<button class="prog-btn-sm" style="background:var(--mid);border:1px solid var(--border);margin-top:6px" onclick="progToggleAberta(' + i + ',' + (row.aberta ? 'false' : 'true') + ')">' +
+            (row.aberta ? 'Fechar a outros' : 'Abrir a outros') + '</button>'
+          : '') +
+      '</div>';
+    }
+    document.getElementById('progListaBody').innerHTML = html;
+  }
+
+  async function progGuardarLinha(posicao) {
+    const codigo = document.getElementById('pc_' + posicao).value.trim();
+    const prog = document.getElementById('pp_' + posicao).value.trim();
+    const valTxt = document.getElementById('pv_' + posicao).value.trim();
+    const valor = valTxt ? progNum(valTxt) : null;
+    if (valTxt && isNaN(valor)) { showToast('Valor invalido.', 'error'); return; }
+    try {
+      const r = await fetch(SUPABASE_URL + '/rest/v1/rpc/prog_guardar_prognostico', {
+        method: 'POST', headers: progHeaders(),
+        body: JSON.stringify({
+          p_lista: progListaId, p_posicao: posicao, p_codigo: codigo,
+          p_prognostico: prog, p_valor: valor, p_phone: progMyPhone()
+        })
+      });
+      if (r.ok) { showToast('\u2713 Guardado.', 'success'); progCarregarDia(); }
+      else {
+        const d = await r.json().catch(() => ({}));
+        showToast(d.message || 'Erro ao guardar.', 'error');
+      }
+    } catch (e) { showToast('Erro de ligacao.', 'error'); }
+  }
+
+  async function progToggleAberta(posicao, abrir) {
+    try {
+      const r = await fetch(SUPABASE_URL + '/rest/v1/rpc/prog_abrir_posicao', {
+        method: 'POST', headers: progHeaders(),
+        body: JSON.stringify({ p_lista: progListaId, p_posicao: posicao, p_abrir: abrir, p_phone: progMyPhone() })
+      });
+      if (r.ok) { showToast(abrir ? 'Posicao aberta.' : 'Posicao fechada.', 'success'); progCarregarDia(); }
+      else { const d = await r.json().catch(() => ({})); showToast(d.message || 'Erro.', 'error'); }
+    } catch (e) { showToast('Erro de ligacao.', 'error'); }
   }
 
   function progComoPagar() {
