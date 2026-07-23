@@ -582,6 +582,11 @@
     updateSelectedLocLabel();
     if (!fromRegister) initLocation();
 
+    // Link partilhado: ?lista=ID abre direto no separador Prognostico
+    try {
+      if (new URLSearchParams(location.search).get('lista')) setTimeout(() => switchNav('prognostico'), 300);
+    } catch (e) {}
+
     // Verificar se notificações já foram ativadas neste browser
     const userPhone = session.user?.user_metadata?.phone || localStorage.getItem('toaki_phone') || '';
     if (userPhone && !window._showWelcome) {
@@ -1474,8 +1479,17 @@
     // Botao criar sempre visivel
     html += '<button class="prog-btn" onclick="progAbrirCriar()">+ Criar lista</button>';
 
-    // ----- As minhas listas (onde ocupo posicoes) -----
     const meusGrupos = [...new Set(progMinhas.map(p => p.grupo_id))];
+
+    // ----- Lista partilhada por link (?lista=ID) -----
+    let deepId = null;
+    try { deepId = parseInt(new URLSearchParams(location.search).get('lista'), 10) || null; } catch (e) {}
+    if (deepId && progGrupos.some(g => g.id === deepId) && meusGrupos.indexOf(deepId) < 0) {
+      html += '<div class="section-label" style="margin:14px 4px 6px">Lista partilhada contigo</div>';
+      html += progGrupoCard(deepId, true);
+    }
+
+    // ----- As minhas listas (onde ocupo posicoes) -----
     html += '<div class="section-label" style="margin:14px 4px 6px">As minhas listas</div>';
     if (meusGrupos.length) {
       meusGrupos.forEach(gid => { html += progGrupoCard(gid, true); });
@@ -1523,6 +1537,7 @@
              '<div class="prog-badge"><div class="prog-badge-val">' + progFmt(meusCreditos) + '</div><div class="prog-badge-lbl">Os meus creditos</div></div>' +
            '</div>';
     }
+    const souDono = g.criado_por && normalizePhone(g.criado_por) === myPhone;
     for (let i = 1; i <= 8; i++) {
       const p = ocupadas[i];
       if (p) {
@@ -1548,7 +1563,22 @@
              '<div class="prog-pos-name" style="color:var(--muted)">Livre</div></div>';
       }
     }
+    if (souDono && nOcup < 8) {
+      h += '<button class="prog-btn" style="background:#25D366" onclick="progPartilhar(' + grupoId + ')">Convidar por WhatsApp</button>';
+    }
     return h + '</div>';
+  }
+
+  function progPartilhar(grupoId) {
+    const g = progGrupos.find(x => x.id === grupoId);
+    if (!g) return;
+    const ocup = progParts.filter(p => p.grupo_id === grupoId).length;
+    const url = BASE_URL + 'toaki.html?lista=' + grupoId;
+    const txt = 'Junta-te à minha lista "' + g.nome + '" no TÔAKI \u2014 O MEU PROGNÓSTICO.\n\n' +
+                'Posições livres: ' + (8 - ocup) + '/8\n' +
+                'Valor da hode: ' + progFmt(g.hode_min) + '\u2013' + progFmt(g.hode_max) + '\u20AC\n\n' +
+                'Escolhe a tua posição aqui: ' + url;
+    window.open('https://wa.me/?text=' + encodeURIComponent(txt), '_blank');
   }
 
   function progComoPagar() {
