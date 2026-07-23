@@ -1614,7 +1614,7 @@
   }
 
   // ===== LISTAS DIARIAS DE PROGNOSTICOS =====
-  let progListaGrupo = null, progListaId = null, progListaRows = [], progListaFechada = false;
+  let progListaGrupo = null, progListaId = null, progListaRows = [], progListaFechada = false, progLinhaAberta = null;
 
   function progAbrirPrognosticos(grupoId) {
     progListaGrupo = grupoId;
@@ -1663,6 +1663,11 @@
     }
   }
 
+  function progToggleLinha(i) {
+    progLinhaAberta = (progLinhaAberta === i) ? null : i;
+    progRenderDia();
+  }
+
   function progRenderDia() {
     const myPhone = progMyPhone();
     const souAceite = progParts.some(p => p.grupo_id === progListaGrupo && normalizePhone(p.phone) === myPhone && p.estado === 'aceite');
@@ -1672,24 +1677,41 @@
       const part = progParts.find(p => p.grupo_id === progListaGrupo && p.posicao === i && p.estado === 'aceite');
       const euDono = part && normalizePhone(part.phone) === myPhone;
       const editavel = souAceite && !progListaFechada && (euDono || row.aberta === true);
-      const dis = editavel ? '' : ' disabled';
+      const expandida = progLinhaAberta === i && editavel;
+
+      const temDados = row.codigo_jogo || row.prognostico || row.valor != null;
+      const resumo = temDados
+        ? ((row.codigo_jogo ? 'Jogo ' + row.codigo_jogo : '') +
+           (row.prognostico ? (row.codigo_jogo ? ' \u00B7 ' : '') + row.prognostico : '') +
+           (row.valor != null ? ' \u00B7 ' + progFmt(row.valor) + '\u20AC' : ''))
+        : 'Por preencher';
+
       html += '<div class="prog-row' + (euDono ? ' eu' : '') + '">' +
-        '<div class="prog-row-top">' +
+        '<div class="prog-row-top"' + (editavel ? ' style="cursor:pointer" onclick="progToggleLinha(' + i + ')"' : '') + '>' +
           '<div class="prog-pos-num">' + i + '</div>' +
-          '<div class="prog-row-name">' + (part ? part.nome : '<span style="color:var(--muted)">Posicao livre</span>') +
-            (row.aberta ? ' <span class="prog-tag-open">aberta</span>' : '') + '</div>' +
-        '</div>' +
-        '<input class="prog-in" id="pc_' + i + '" placeholder="Codigo do jogo" value="' + (row.codigo_jogo || '') + '"' + dis + '>' +
-        '<input class="prog-in" id="pp_' + i + '" placeholder="Prognostico" value="' + (row.prognostico || '') + '"' + dis + '>' +
-        '<div class="prog-in-row">' +
-          '<input class="prog-in" id="pv_' + i + '" inputmode="decimal" placeholder="Valor" value="' + (row.valor != null ? progFmt(row.valor) : '') + '"' + dis + '>' +
-          (editavel ? '<button class="prog-btn-sm" style="height:38px" onclick="progGuardarLinha(' + i + ')">Guardar</button>' : '') +
-        '</div>' +
-        (euDono && !progListaFechada
-          ? '<button class="prog-btn-sm" style="background:var(--mid);border:1px solid var(--border);margin-top:6px" onclick="progToggleAberta(' + i + ',' + (row.aberta ? 'false' : 'true') + ')">' +
-            (row.aberta ? 'Fechar a outros' : 'Abrir a outros') + '</button>'
-          : '') +
-      '</div>';
+          '<div class="prog-row-name">' +
+            (part ? part.nome : '<span style="color:var(--muted)">Posicao livre</span>') +
+            (row.aberta ? ' <span class="prog-tag-open">aberta</span>' : '') +
+            '<div class="prog-sub" style="margin-top:2px">' + resumo + '</div>' +
+          '</div>' +
+          (editavel ? '<div class="prog-pos-tag" style="color:var(--red)">' + (expandida ? 'Fechar' : 'Editar') + '</div>' : '') +
+        '</div>';
+
+      if (expandida) {
+        html += '<div style="margin-top:10px">' +
+          '<input class="prog-in" id="pc_' + i + '" placeholder="Codigo do jogo" value="' + (row.codigo_jogo || '') + '">' +
+          '<input class="prog-in" id="pp_' + i + '" placeholder="Prognostico" value="' + (row.prognostico || '') + '">' +
+          '<div class="prog-in-row">' +
+            '<input class="prog-in" id="pv_' + i + '" inputmode="decimal" placeholder="Valor" value="' + (row.valor != null ? progFmt(row.valor) : '') + '">' +
+            '<button class="prog-btn-sm" style="height:38px" onclick="progGuardarLinha(' + i + ')">Guardar</button>' +
+          '</div>' +
+          (euDono
+            ? '<button class="prog-btn-sm" style="background:var(--mid);border:1px solid var(--border);width:100%" onclick="progToggleAberta(' + i + ',' + (row.aberta ? 'false' : 'true') + ')">' +
+              (row.aberta ? 'Fechar a outros' : 'Abrir a outros') + '</button>'
+            : '') +
+        '</div>';
+      }
+      html += '</div>';
     }
     document.getElementById('progListaBody').innerHTML = html;
   }
@@ -1708,7 +1730,7 @@
           p_prognostico: prog, p_valor: valor, p_phone: progMyPhone()
         })
       });
-      if (r.ok) { showToast('\u2713 Guardado.', 'success'); progCarregarDia(); }
+      if (r.ok) { showToast('\u2713 Guardado.', 'success'); progLinhaAberta = null; progCarregarDia(); }
       else {
         const d = await r.json().catch(() => ({}));
         showToast(d.message || 'Erro ao guardar.', 'error');
