@@ -1516,10 +1516,14 @@
       if (p) {
         const eu = normalizePhone(p.phone) === myPhone;
         const tag = p.estado === 'pendente' ? 'Pendente' : (eu ? 'Tu' : '');
+        const euPendente = eu && p.estado === 'pendente';
+        const acao = euPendente
+          ? '<button class="prog-btn-sm" onclick="progComoPagar()">Como pagar</button>'
+          : '<div class="prog-pos-tag">' + tag + '</div>';
         h += '<div class="prog-pos' + (eu ? ' minha' : '') + '">' +
                '<div class="prog-pos-num">' + i + '</div>' +
-               '<div class="prog-pos-name">' + p.nome + (eu && p.estado === 'pendente' ? ' <span class="prog-pos-tag" style="color:var(--red)">(a aguardar)</span>' : '') + '</div>' +
-               '<div class="prog-pos-tag">' + tag + '</div>' +
+               '<div class="prog-pos-name">' + p.nome + (euPendente ? '<div class="prog-sub" style="color:var(--red)">A aguardar aceitacao</div>' : '') + '</div>' +
+               acao +
              '</div>';
       } else if (permitirInscricao) {
         h += '<div class="prog-pos livre" onclick="progInscrever(' + grupoId + ',' + i + ')">' +
@@ -1531,10 +1535,6 @@
         h += '<div class="prog-pos"><div class="prog-pos-num">' + i + '</div>' +
              '<div class="prog-pos-name" style="color:var(--muted)">Livre</div></div>';
       }
-    }
-    // Botao Como pagar se tenho posicoes pendentes neste grupo
-    if (minhasAqui.some(p => p.estado === 'pendente')) {
-      h += '<button class="prog-btn" style="background:var(--mid);border:1px solid var(--border)" onclick="progComoPagar()">Como pagar</button>';
     }
     return h + '</div>';
   }
