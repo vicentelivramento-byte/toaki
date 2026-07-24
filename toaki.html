@@ -1485,6 +1485,7 @@
   }
 
   let progBuscaTxt = '';
+  let progGrupoExpandido = null;
   // configura aqui as instrucoes de pagamento MB WAY (numero/chave a preencher)
   const MBWAY_INFO = 'PREENCHER: numero MB WAY';
 
@@ -1530,22 +1531,39 @@
     html += '<div class="section-label" style="margin:16px 4px 6px">Procurar listas disponiveis</div>';
     html += '<input class="place-input" id="progBusca" placeholder="Procurar lista pelo nome..." oninput="renderProg()" value="' + (progBuscaTxt || '') + '">';
     const termo = (progBuscaTxt || '').trim().toLowerCase();
-    if (!termo) {
-      html += '<div class="prog-empty">Escreve o nome de uma lista para procurar.</div>';
+    const disponiveis = progGrupos.filter(g => {
+      const ocup = progParts.filter(p => p.grupo_id === g.id).length;
+      const completa = ocup >= 8;                       // listas cheias nunca aparecem
+      const jaEstou = meusGrupos.indexOf(g.id) >= 0;
+      const bateNome = !termo || (g.nome || '').toLowerCase().indexOf(termo) >= 0;
+      return !completa && !jaEstou && bateNome;
+    });
+    if (!disponiveis.length) {
+      html += '<div class="prog-empty">' + (termo ? 'Nenhuma lista disponivel com esse nome.' : 'Nao ha listas disponiveis.') + '</div>';
     } else {
-      const disponiveis = progGrupos.filter(g => {
+      disponiveis.forEach(g => {
+        if (progGrupoExpandido === g.id) { html += progGrupoCard(g.id, true); return; }
         const ocup = progParts.filter(p => p.grupo_id === g.id).length;
-        const completa = ocup >= 8;
-        const jaEstou = meusGrupos.indexOf(g.id) >= 0;
-        const bateNome = (g.nome || '').toLowerCase().indexOf(termo) >= 0;
-        return !completa && !jaEstou && bateNome;
+        const hodeTxt = (g.hode_min != null) ? (' \u00B7 hode ' + progFmt(g.hode_min) + '\u2013' + progFmt(g.hode_max) + '\u20AC') : '';
+        html += '<div class="prog-card" style="padding:12px;cursor:pointer" onclick="progToggleGrupo(' + g.id + ')">' +
+                  '<div style="display:flex;align-items:center;gap:10px">' +
+                    '<div style="flex:1">' +
+                      '<div class="prog-card-title" style="font-size:14px;margin-bottom:2px">' + g.nome + '</div>' +
+                      '<div class="prog-sub">' + (8 - ocup) + ' posicoes livres' + hodeTxt + '</div>' +
+                    '</div>' +
+                    '<div class="prog-pos-tag" style="color:var(--red)">Ver</div>' +
+                  '</div>' +
+                '</div>';
       });
-      if (!disponiveis.length) html += '<div class="prog-empty">Nenhuma lista disponivel com esse nome.</div>';
-      disponiveis.forEach(g => { html += progGrupoCard(g.id, true); });
     }
 
     if (progIsAdmin) html += progAdminPanel();
     box.innerHTML = html;
+  }
+
+  function progToggleGrupo(id) {
+    progGrupoExpandido = (progGrupoExpandido === id) ? null : id;
+    renderProg();
   }
 
   function progGrupoCard(grupoId, permitirInscricao) {
@@ -1721,7 +1739,15 @@
     const prog = document.getElementById('pp_' + posicao).value.trim();
     const valTxt = document.getElementById('pv_' + posicao).value.trim();
     const valor = valTxt ? progNum(valTxt) : null;
-    if (valTxt && isNaN(valor)) { showToast('Valor invalido.', 'error'); return; }
+    if (valTxt && isNaN(valor)) { alert('Valor invalido. Escreve um numero (ex: 2,5).'); return; }
+    const gr = progGrupos.find(x => x.id === progListaGrupo);
+    if (valor != null && gr && gr.hode_min != null) {
+      const mn = Number(gr.hode_min), mx = Number(gr.hode_max);
+      if (valor < mn || valor > mx) {
+        alert('VALOR FORA DO INTERVALO\n\nNesta lista o valor tem de estar entre ' + progFmt(mn) + '\u20AC e ' + progFmt(mx) + '\u20AC.\n\nInseriste: ' + progFmt(valor) + '\u20AC');
+        return;
+      }
+    }
     try {
       const r = await fetch(SUPABASE_URL + '/rest/v1/rpc/prog_guardar_prognostico', {
         method: 'POST', headers: progHeaders(),
@@ -1733,7 +1759,7 @@
       if (r.ok) { showToast('\u2713 Guardado.', 'success'); progLinhaAberta = null; progCarregarDia(); }
       else {
         const d = await r.json().catch(() => ({}));
-        showToast(d.message || 'Erro ao guardar.', 'error');
+        alert(d.message || 'Erro ao guardar.');
       }
     } catch (e) { showToast('Erro de ligacao.', 'error'); }
   }
