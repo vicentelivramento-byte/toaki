@@ -489,6 +489,20 @@
   </div>
 </div>
 
+<div class="modal-overlay" id="progAdminModal" onclick="if(event.target===this)this.classList.remove('open')">
+  <div class="modal">
+    <div class="modal-handle"></div>
+    <div class="modal-title" id="progAdminTitulo">Registar</div>
+    <div class="prog-sub" id="progAdminSub" style="margin-bottom:12px"></div>
+    <input class="place-input" id="progAdminValor" inputmode="decimal" placeholder="Valor">
+    <input type="file" id="progAdminFile" accept="image/*" style="display:none" onchange="progAdminFoto(event)">
+    <button class="modal-btn" style="background:var(--mid);border:1px solid var(--border)" onclick="document.getElementById('progAdminFile').click()">Escolher foto</button>
+    <div id="progAdminFotoPrev" style="display:none;margin-top:10px"><img id="progAdminImg" style="width:100%;border-radius:12px"></div>
+    <button class="modal-btn" id="progAdminBtn" onclick="progAdminConfirmar()" disabled style="opacity:0.5;margin-top:10px">Confirmar</button>
+    <button class="modal-btn-cancel" onclick="document.getElementById('progAdminModal').classList.remove('open')">Cancelar</button>
+  </div>
+</div>
+
 <div class="prog-ov" id="prognosticosOverlay">
   <div class="prog-ov-head">
     <button class="prog-ov-close" onclick="progFecharPrognosticos()">&#10005;</button>
@@ -1452,7 +1466,7 @@
   }
   function updateChar() { document.getElementById('charCount').textContent = document.getElementById('msgInput').value.length; }
   // ===== O MEU PROGNOSTICO =====
-  let progIsAdmin = false, progGrupos = [], progParts = [], progMinhas = [], progHodes = [];
+  let progIsAdmin = false, progGrupos = [], progParts = [], progMinhas = [], progHodes = [], progProntas = [], progRegistadas = [];
 
   function progHeaders() { return { 'apikey': SUPABASE_KEY, 'Content-Type': 'application/json' }; }
   function progMyPhone() {
@@ -1477,6 +1491,14 @@
       progGrupos = Array.isArray(gr) ? gr : [];
       progParts = Array.isArray(pr) ? pr : [];
       progHodes = Array.isArray(hd) ? hd : [];
+      if (progIsAdmin) {
+        const [prt, reg] = await Promise.all([
+          fetch(SUPABASE_URL + '/rest/v1/prog_prontas?select=*&order=data.asc', { headers: progHeaders() }).then(r => r.json()).catch(() => []),
+          fetch(SUPABASE_URL + '/rest/v1/prog_listas?estado=in.(registada,terminada)&select=*,prog_grupos(nome)&order=data.desc', { headers: progHeaders() }).then(r => r.json()).catch(() => [])
+        ]);
+        progProntas = Array.isArray(prt) ? prt : [];
+        progRegistadas = Array.isArray(reg) ? reg : [];
+      }
       progMinhas = progParts.filter(p => normalizePhone(p.phone) === myPhone);
       renderProg();
     } catch (e) {
@@ -1784,6 +1806,80 @@
     } catch (e) { showToast('Erro de ligacao.', 'error'); }
   }
 
+  // ===== ADMIN: registar / terminar com foto e creditos =====
+  let progAdminLista = null, progAdminAcao = null, progAdminFotoUrl = null;
+
+  function progAdminAbrir(listaId, acao) {
+    progAdminLista = listaId; progAdminAcao = acao; progAdminFotoUrl = null;
+    const l = (acao === 'registar')
+      ? progProntas.find(x => x.id === listaId)
+      : progRegistadas.find(x => x.id === listaId);
+    document.getElementById('progAdminTitulo').textContent = acao === 'registar' ? 'Registar lista' : 'Resultado (ganhos)';
+    document.getElementById('progAdminSub').textContent = l ? ((l.grupo_nome || (l.prog_grupos && l.prog_grupos.nome) || '') + ' \u00B7 ' + l.data) : '';
+    document.getElementById('progAdminValor').value = '';
+    document.getElementById('progAdminValor').placeholder = acao === 'registar' ? 'Valor do registo' : 'Valor dos ganhos';
+    document.getElementById('progAdminFotoPrev').style.display = 'none';
+    const b = document.getElementById('progAdminBtn'); b.disabled = true; b.style.opacity = '0.5';
+    document.getElementById('progAdminBtn').textContent = acao === 'registar' ? 'Registar e retirar creditos' : 'Terminar e creditar';
+    document.getElementById('progAdminModal').classList.add('open');
+  }
+
+  function progAdminFoto(event) {
+    const file = event.target.files[0];
+    if (!file) return;
+    showToast('\u23F3 A carregar foto...', '');
+    const reader = new FileReader();
+    reader.onload = function(e) {
+      const img = new Image();
+      img.onload = async function() {
+        const canvas = document.createElement('canvas');
+        const maxSize = 1200; let w = img.width, h = img.height;
+        if (w > maxSize || h > maxSize) { if (w > h) { h = Math.round(h * maxSize / w); w = maxSize; } else { w = Math.round(w * maxSize / h); h = maxSize; } }
+        canvas.width = w; canvas.height = h;
+        canvas.getContext('2d').drawImage(img, 0, 0, w, h);
+        const dataUrl = canvas.toDataURL('image/jpeg', 0.8);
+        document.getElementById('progAdminImg').src = dataUrl;
+        document.getElementById('progAdminFotoPrev').style.display = 'block';
+        try {
+          const b64 = dataUrl.split(',')[1];
+          const bin = atob(b64); const arr = new Uint8Array(bin.length);
+          for (let i = 0; i < bin.length; i++) arr[i] = bin.charCodeAt(i);
+          const filename = 'reg_' + Date.now() + '_' + Math.random().toString(36).substr(2, 6) + '.jpg';
+          const r = await fetch(SUPABASE_URL + '/storage/v1/object/fotos/' + filename, {
+            method: 'POST',
+            headers: { 'Authorization': 'Bearer ' + SUPABASE_KEY, 'Content-Type': 'image/jpeg', 'x-upsert': 'true' },
+            body: new Blob([arr], { type: 'image/jpeg' })
+          });
+          if (r.ok) {
+            progAdminFotoUrl = SUPABASE_URL + '/storage/v1/object/public/fotos/' + filename;
+            showToast('\u2713 Foto carregada!', 'success');
+            const b = document.getElementById('progAdminBtn'); b.disabled = false; b.style.opacity = '1';
+          } else { showToast('Erro ao carregar foto.', 'error'); }
+        } catch (err) { showToast('Erro ao carregar foto.', 'error'); }
+      };
+      img.src = e.target.result;
+    };
+    reader.readAsDataURL(file);
+  }
+
+  async function progAdminConfirmar() {
+    const valor = progNum(document.getElementById('progAdminValor').value);
+    if (isNaN(valor)) { alert('Escreve o valor.'); return; }
+    if (!progAdminFotoUrl) { alert('Carrega a foto primeiro.'); return; }
+    const rpc = progAdminAcao === 'registar' ? 'prog_registar_lista' : 'prog_terminar_lista';
+    try {
+      const r = await fetch(SUPABASE_URL + '/rest/v1/rpc/' + rpc, {
+        method: 'POST', headers: progHeaders(),
+        body: JSON.stringify({ p_lista: progAdminLista, p_valor: valor, p_foto: progAdminFotoUrl, p_por: progMyPhone() })
+      });
+      if (r.ok) {
+        showToast('\u2713 Feito.', 'success');
+        document.getElementById('progAdminModal').classList.remove('open');
+        loadProg();
+      } else { const d = await r.json().catch(() => ({})); alert(d.message || 'Erro.'); }
+    } catch (e) { showToast('Erro de ligacao.', 'error'); }
+  }
+
   function progComoPagar() {
     const nome = userName || 'o teu nome';
     alert('COMO PAGAR (MB WAY)\n\n' + MBWAY_INFO + '\n\nValor: 20\u20AC por posicao.\n\nIMPORTANTE: nas observacoes do pagamento escreve o teu nome: "' + nome + '"\n\nApos o pagamento, a administracao aceita a tua posicao.');
@@ -1805,6 +1901,42 @@
            '<button class="prog-btn-sm" onclick="progAddHode()">Add</button>' +
          '</div>';
     h += '</div>';
+
+    // LISTA DE PRONTAS (a registar)
+    h += '<div class="prog-card prog-admin"><div class="prog-card-title">Lista de prontas (' + progProntas.length + ')</div>';
+    if (!progProntas.length) h += '<div class="prog-sub">Nenhuma lista pronta.</div>';
+    progProntas.forEach(l => {
+      h += '<div class="prog-pos" style="margin-top:8px">' +
+             '<div class="prog-pos-name">' + l.grupo_nome + '<div class="prog-sub">' + l.data + '</div></div>' +
+             '<button class="prog-btn-sm" onclick="progAdminAbrir(' + l.id + ',\'registar\')">Registar</button>' +
+           '</div>';
+    });
+    h += '</div>';
+
+    // REGISTADAS (a terminar) e TERMINADAS
+    const regs = progRegistadas.filter(l => l.estado === 'registada');
+    const terms = progRegistadas.filter(l => l.estado === 'terminada');
+    h += '<div class="prog-card prog-admin"><div class="prog-card-title">Registadas (' + regs.length + ')</div>';
+    if (!regs.length) h += '<div class="prog-sub">Nenhuma.</div>';
+    regs.forEach(l => {
+      h += '<div class="prog-pos" style="margin-top:8px">' +
+             '<div class="prog-pos-name">' + (l.prog_grupos ? l.prog_grupos.nome : '') + '<div class="prog-sub">' + l.data + ' \u00B7 registo ' + progFmt(l.valor_registo) + '\u20AC</div></div>' +
+             '<button class="prog-btn-sm" onclick="progAdminAbrir(' + l.id + ',\'terminar\')">Resultado</button>' +
+           '</div>';
+    });
+    h += '</div>';
+    if (terms.length) {
+      h += '<div class="prog-card prog-admin"><div class="prog-card-title">Terminadas (' + terms.length + ')</div>';
+      terms.forEach(l => {
+        const saldo = Number(l.valor_ganhos || 0) - Number(l.valor_registo || 0);
+        h += '<div class="prog-pos" style="margin-top:8px">' +
+               '<div class="prog-pos-name">' + (l.prog_grupos ? l.prog_grupos.nome : '') + '<div class="prog-sub">' + l.data + ' \u00B7 registo ' + progFmt(l.valor_registo) + '\u20AC \u00B7 ganhos ' + progFmt(l.valor_ganhos) + '\u20AC</div></div>' +
+               '<div class="prog-pos-tag" style="color:' + (saldo >= 0 ? '#2ECC71' : 'var(--red)') + '">' + (saldo >= 0 ? '+' : '') + progFmt(saldo) + '\u20AC</div>' +
+             '</div>';
+      });
+      h += '</div>';
+    }
+
     h += '<div class="prog-card prog-admin"><div class="prog-card-title">Inscricoes</div>';
     if (!pend.length) {
       h += '<div class="prog-sub">Sem inscricoes pendentes.</div>';
