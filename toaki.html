@@ -82,7 +82,7 @@
     .prog-ov-head { position: sticky; top: 0; background: var(--dark); border-bottom: 1px solid var(--border); padding: 16px; display: flex; align-items: center; gap: 12px; z-index: 2; }
     .prog-ov-title { font-family: 'Syne', sans-serif; font-size: 17px; font-weight: 800; flex: 1; }
     .prog-ov-close { background: transparent; border: 1px solid var(--border); color: var(--text); border-radius: 10px; width: 34px; height: 34px; font-size: 16px; cursor: pointer; }
-    .prog-ov-body { padding: 16px; }
+    .prog-ov-body { padding: 16px; max-width: 560px; margin: 0 auto; }
     .prog-row { border: 1px solid var(--border); border-radius: 12px; padding: 12px; margin-bottom: 10px; background: var(--surface); }
     .prog-row.eu { border-color: var(--red); background: rgba(232,57,42,0.05); }
     .prog-row-top { display: flex; align-items: center; gap: 10px; margin-bottom: 10px; }
@@ -1893,11 +1893,37 @@
         body: JSON.stringify({ p_lista: progAdminLista, p_valor: valor, p_foto: progAdminFotoUrl, p_por: progMyPhone() })
       });
       if (r.ok) {
-        showToast('\u2713 Feito.', 'success');
+        showToast('\u2713 Feito. A enviar foto aos participantes...', 'success');
         document.getElementById('progAdminModal').classList.remove('open');
+        progEnviarFotoParticipantes();
         loadProg();
       } else { const d = await r.json().catch(() => ({})); alert(d.message || 'Erro.'); }
     } catch (e) { showToast('Erro de ligacao.', 'error'); }
+  }
+
+  async function progEnviarFotoParticipantes() {
+    try {
+      const lista = progProntas.find(x => x.id === progAdminLista) || progRegistadas.find(x => x.id === progAdminLista);
+      const grupoId = lista ? lista.grupo_id : null;
+      if (!grupoId || !progAdminFotoUrl) return;
+      const g = progGrupos.find(x => x.id === grupoId);
+      const titulo = progAdminAcao === 'registar' ? 'Registo da lista' : 'Resultado da lista';
+      const phones = [...new Set(progParts.filter(p => p.grupo_id === grupoId && p.estado === 'aceite').map(p => normalizePhone(p.phone)))];
+      for (const ph of phones) {
+        try {
+          await fetch(SUPABASE_URL + '/functions/v1/swift-action', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json', 'apikey': SUPABASE_KEY },
+            body: JSON.stringify({
+              phone: ph,
+              title: '\uD83D\uDCF8 ' + titulo + (g ? ' - ' + g.nome : ''),
+              body: 'Toca para ver a foto ' + (progAdminAcao === 'registar' ? 'do registo' : 'do resultado') + '.',
+              url: progAdminFotoUrl
+            })
+          });
+        } catch (e) {}
+      }
+    } catch (e) { console.error('envio foto:', e); }
   }
 
   function progComoPagar() {
