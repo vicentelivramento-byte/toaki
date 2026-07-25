@@ -494,6 +494,8 @@
     <div class="modal-handle"></div>
     <div class="modal-title" id="progAdminTitulo">Registar</div>
     <div class="prog-sub" id="progAdminSub" style="margin-bottom:12px"></div>
+    <div class="section-label" style="margin:4px 0 6px">Prognosticos da lista</div>
+    <div id="progAdminProgs" style="max-height:200px;overflow-y:auto;margin-bottom:12px"></div>
     <input class="place-input" id="progAdminValor" inputmode="decimal" placeholder="Valor">
     <input type="file" id="progAdminFile" accept="image/*" style="display:none" onchange="progAdminFoto(event)">
     <button class="modal-btn" style="background:var(--mid);border:1px solid var(--border)" onclick="document.getElementById('progAdminFile').click()">Escolher foto</button>
@@ -1768,8 +1770,11 @@
     const codigo = document.getElementById('pc_' + posicao).value.trim();
     const prog = document.getElementById('pp_' + posicao).value.trim();
     const valTxt = document.getElementById('pv_' + posicao).value.trim();
-    const valor = valTxt ? progNum(valTxt) : null;
-    if (valTxt && isNaN(valor)) { alert('Valor invalido. Escreve um numero (ex: 2,5).'); return; }
+    if (!codigo) { alert('Falta o codigo do jogo.'); return; }
+    if (!prog) { alert('Falta o prognostico.'); return; }
+    if (!valTxt) { alert('Falta o valor.'); return; }
+    const valor = progNum(valTxt);
+    if (isNaN(valor)) { alert('Valor invalido. Escreve um numero (ex: 2,5).'); return; }
     const gr = progGrupos.find(x => x.id === progListaGrupo);
     if (valor != null && gr && gr.hode_min != null) {
       const mn = Number(gr.hode_min), mx = Number(gr.hode_max);
@@ -1809,13 +1814,28 @@
   // ===== ADMIN: registar / terminar com foto e creditos =====
   let progAdminLista = null, progAdminAcao = null, progAdminFotoUrl = null;
 
-  function progAdminAbrir(listaId, acao) {
+  async function progAdminAbrir(listaId, acao) {
     progAdminLista = listaId; progAdminAcao = acao; progAdminFotoUrl = null;
     const l = (acao === 'registar')
       ? progProntas.find(x => x.id === listaId)
       : progRegistadas.find(x => x.id === listaId);
     document.getElementById('progAdminTitulo').textContent = acao === 'registar' ? 'Registar lista' : 'Resultado (ganhos)';
     document.getElementById('progAdminSub').textContent = l ? ((l.grupo_nome || (l.prog_grupos && l.prog_grupos.nome) || '') + ' \u00B7 ' + l.data) : '';
+    // Mostrar os prognosticos da lista (para o admin fazer o registo)
+    const pv = document.getElementById('progAdminProgs');
+    pv.innerHTML = '<div class="prog-sub">A carregar prognosticos...</div>';
+    try {
+      const rows = await fetch(SUPABASE_URL + '/rest/v1/prog_prognosticos?lista_id=eq.' + listaId + '&order=posicao.asc&select=posicao,codigo_jogo,prognostico,valor', { headers: progHeaders() }).then(r => r.json());
+      let hh = '';
+      (rows || []).forEach(r => {
+        hh += '<div class="prog-pos" style="margin-top:6px">' +
+                '<div class="prog-pos-num">' + r.posicao + '</div>' +
+                '<div class="prog-pos-name" style="font-size:12px">Jogo <b>' + (r.codigo_jogo || '\u2014') + '</b> \u00B7 ' + (r.prognostico || '\u2014') + '</div>' +
+                '<div class="prog-pos-tag">' + (r.valor != null ? progFmt(r.valor) + '\u20AC' : '') + '</div>' +
+              '</div>';
+      });
+      pv.innerHTML = hh || '<div class="prog-sub">Sem linhas.</div>';
+    } catch (e) { pv.innerHTML = '<div class="prog-sub">Erro ao carregar.</div>'; }
     document.getElementById('progAdminValor').value = '';
     document.getElementById('progAdminValor').placeholder = acao === 'registar' ? 'Valor do registo' : 'Valor dos ganhos';
     document.getElementById('progAdminFotoPrev').style.display = 'none';
