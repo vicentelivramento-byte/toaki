@@ -1589,14 +1589,22 @@
       const p = ocupadas[i];
       if (p) {
         const eu = normalizePhone(p.phone) === myPhone;
-        const tag = p.estado === 'pendente' ? 'Pendente' : (eu ? 'Tu' : '');
         const euPendente = eu && p.estado === 'pendente';
-        const acao = euPendente
-          ? '<button class="prog-btn-sm" onclick="progComoPagar()">Como pagar</button>'
-          : '<div class="prog-pos-tag">' + tag + '</div>';
+        const euAceite = eu && p.estado === 'aceite';
+        let acao;
+        if (euPendente) {
+          acao = '<button class="prog-btn-sm" onclick="progComoPagar()">Como pagar</button>';
+        } else if (euAceite) {
+          acao = '<button class="prog-btn-sm" style="background:' + (p.aberta ? 'var(--mid);border:1px solid var(--border)' : '#2ECC71') + '" onclick="progAbrirParticipacao(' + grupoId + ',' + i + ',' + (p.aberta ? 'false' : 'true') + ')">' + (p.aberta ? 'Fechar' : 'Abrir a outros') + '</button>';
+        } else {
+          acao = '<div class="prog-pos-tag">' + (p.estado === 'pendente' ? 'Pendente' : '') + '</div>';
+        }
         h += '<div class="prog-pos' + (eu ? ' minha' : '') + '">' +
                '<div class="prog-pos-num">' + i + '</div>' +
-               '<div class="prog-pos-name">' + p.nome + (euPendente ? '<div class="prog-sub" style="color:var(--red)">A aguardar aceitacao</div>' : '') + '</div>' +
+               '<div class="prog-pos-name">' + p.nome +
+                 (euPendente ? '<div class="prog-sub" style="color:var(--red)">A aguardar aceitacao</div>' : '') +
+                 (p.aberta ? ' <span class="prog-tag-open">aberta</span>' : '') +
+               '</div>' +
                acao +
              '</div>';
       } else if (permitirInscricao) {
@@ -1694,7 +1702,8 @@
       const row = progListaRows.find(r => r.posicao === i) || { posicao: i };
       const part = progParts.find(p => p.grupo_id === progListaGrupo && p.posicao === i && p.estado === 'aceite');
       const euDono = part && normalizePhone(part.phone) === myPhone;
-      const editavel = souAceite && !progListaFechada && (euDono || row.aberta === true);
+      const aberta = part && part.aberta === true;              // abertura ao nivel do participante
+      const editavel = souAceite && !progListaFechada && (euDono || aberta);
       const expandida = progLinhaAberta === i && editavel;
 
       const temDados = row.codigo_jogo || row.prognostico || row.valor != null;
@@ -1702,14 +1711,17 @@
         ? ((row.codigo_jogo ? 'Jogo ' + row.codigo_jogo : '') +
            (row.prognostico ? (row.codigo_jogo ? ' \u00B7 ' : '') + row.prognostico : '') +
            (row.valor != null ? ' \u00B7 ' + progFmt(row.valor) + '\u20AC' : ''))
-        : 'Por preencher';
+        : '\u2014';
+
+      // Titulo: so' a minha linha se identifica; as outras sao anonimas (so' o prognostico)
+      const titulo = euDono
+        ? 'A minha posicao' + (aberta ? ' <span class="prog-tag-open">aberta</span>' : '')
+        : (aberta ? '<span class="prog-tag-open">aberta</span>' : '<span style="color:var(--muted)">Prognostico</span>');
 
       html += '<div class="prog-row' + (euDono ? ' eu' : '') + '">' +
         '<div class="prog-row-top"' + (editavel ? ' style="cursor:pointer" onclick="progToggleLinha(' + i + ')"' : '') + '>' +
-          '<div class="prog-pos-num">' + i + '</div>' +
           '<div class="prog-row-name">' +
-            (part ? part.nome : '<span style="color:var(--muted)">Posicao livre</span>') +
-            (row.aberta ? ' <span class="prog-tag-open">aberta</span>' : '') +
+            titulo +
             '<div class="prog-sub" style="margin-top:2px">' + resumo + '</div>' +
           '</div>' +
           (editavel ? '<div class="prog-pos-tag" style="color:var(--red)">' + (expandida ? 'Fechar' : 'Editar') + '</div>' : '') +
@@ -1723,10 +1735,6 @@
             '<input class="prog-in" id="pv_' + i + '" inputmode="decimal" placeholder="Valor" value="' + (row.valor != null ? progFmt(row.valor) : '') + '">' +
             '<button class="prog-btn-sm" style="height:38px" onclick="progGuardarLinha(' + i + ')">Guardar</button>' +
           '</div>' +
-          (euDono
-            ? '<button class="prog-btn-sm" style="background:var(--mid);border:1px solid var(--border);width:100%" onclick="progToggleAberta(' + i + ',' + (row.aberta ? 'false' : 'true') + ')">' +
-              (row.aberta ? 'Fechar a outros' : 'Abrir a outros') + '</button>'
-            : '') +
         '</div>';
       }
       html += '</div>';
@@ -1764,14 +1772,15 @@
     } catch (e) { showToast('Erro de ligacao.', 'error'); }
   }
 
-  async function progToggleAberta(posicao, abrir) {
+
+  async function progAbrirParticipacao(grupoId, posicao, abrir) {
     try {
-      const r = await fetch(SUPABASE_URL + '/rest/v1/rpc/prog_abrir_posicao', {
+      const r = await fetch(SUPABASE_URL + '/rest/v1/rpc/prog_abrir_posicao_part', {
         method: 'POST', headers: progHeaders(),
-        body: JSON.stringify({ p_lista: progListaId, p_posicao: posicao, p_abrir: abrir, p_phone: progMyPhone() })
+        body: JSON.stringify({ p_grupo: grupoId, p_posicao: posicao, p_abrir: abrir, p_phone: progMyPhone() })
       });
-      if (r.ok) { showToast(abrir ? 'Posicao aberta.' : 'Posicao fechada.', 'success'); progCarregarDia(); }
-      else { const d = await r.json().catch(() => ({})); showToast(d.message || 'Erro.', 'error'); }
+      if (r.ok) { showToast(abrir ? 'Posicao aberta a outros.' : 'Posicao fechada.', 'success'); loadProg(); }
+      else { const d = await r.json().catch(() => ({})); alert(d.message || 'Erro.'); }
     } catch (e) { showToast('Erro de ligacao.', 'error'); }
   }
 
