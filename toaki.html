@@ -1715,14 +1715,21 @@
         fetch(SUPABASE_URL + '/rest/v1/prog_prognosticos?lista_id=eq.' + progListaId + '&order=posicao.asc&select=*', { headers: progHeaders() }).then(x => x.json())
       ]);
       progListaRows = Array.isArray(rows) ? rows : [];
-      const fecha = (Array.isArray(info) && info[0]) ? info[0].fecha_em : null;
-      progListaFechada = fecha ? (new Date(fecha) <= new Date()) : false;
+      const infoRow = (Array.isArray(info) && info[0]) ? info[0] : null;
+      const fecha = infoRow ? infoRow.fecha_em : null;
+      const estado = infoRow ? infoRow.estado : 'aberta';
+      const porHora = fecha ? (new Date(fecha) <= new Date()) : false;
+      const porEstado = (estado === 'registada' || estado === 'terminada');
+      progListaFechada = porHora || porEstado;   // registada/terminada => nao editavel
       const el = document.getElementById('progFechoInfo');
-      if (fecha) {
+      if (porEstado) {
+        el.textContent = estado === 'terminada' ? 'Lista terminada \u2014 nao editavel' : 'Lista registada \u2014 nao editavel';
+        el.className = 'prog-fecho fechada';
+      } else if (fecha) {
         const d = new Date(fecha);
         const txt = d.toLocaleDateString('pt-PT') + ' as ' + d.toLocaleTimeString('pt-PT', { hour: '2-digit', minute: '2-digit' });
-        el.textContent = progListaFechada ? 'Lista fechada desde ' + txt : 'Fecha a ' + txt;
-        el.className = 'prog-fecho' + (progListaFechada ? ' fechada' : '');
+        el.textContent = porHora ? 'Lista fechada desde ' + txt : 'Fecha a ' + txt;
+        el.className = 'prog-fecho' + (porHora ? ' fechada' : '');
       } else { el.textContent = ''; }
       progRenderDia();
     } catch (e) {
