@@ -230,7 +230,32 @@
       <input type="password" id="loginPassword" placeholder="••••••••" autocomplete="current-password">
     </div>
     <button class="auth-btn" onclick="doLogin()">Entrar</button>
+    <div style="text-align:center;margin-top:12px"><a onclick="mostrarRecuperar()" style="color:var(--muted);font-size:13px;cursor:pointer;text-decoration:underline">Esqueci-me da password</a></div>
     <div class="auth-msg" id="loginMsg"></div>
+  </div>
+
+  <div class="auth-form" id="recoverForm" style="display:none">
+    <div class="auth-field">
+      <label>Email da conta</label>
+      <input type="email" id="recoverEmail" placeholder="o.teu@email.com" autocomplete="email">
+    </div>
+    <button class="auth-btn" onclick="pedirRecuperacao()">Enviar link de recuperacao</button>
+    <div style="text-align:center;margin-top:12px"><a onclick="switchTab('login')" style="color:var(--muted);font-size:13px;cursor:pointer;text-decoration:underline">Voltar a entrar</a></div>
+    <div class="auth-msg" id="recoverMsg"></div>
+  </div>
+
+  <div class="auth-form" id="newPassForm" style="display:none">
+    <div style="text-align:center;color:var(--muted);font-size:13px;margin-bottom:14px">Define a tua nova password.</div>
+    <div class="auth-field">
+      <label>Nova password (minimo 6)</label>
+      <input type="password" id="newPass1" placeholder="••••••••">
+    </div>
+    <div class="auth-field">
+      <label>Confirmar password</label>
+      <input type="password" id="newPass2" placeholder="••••••••">
+    </div>
+    <button class="auth-btn" onclick="definirNovaPassword()">Guardar password</button>
+    <div class="auth-msg" id="newPassMsg"></div>
   </div>
 
   <div class="auth-form" id="registerForm" style="display:none">
@@ -578,6 +603,7 @@
     else localStorage.removeItem('toaki_session');
   }
 
+  let recoveryToken = null;
   function loadSession() {
     try { return JSON.parse(localStorage.getItem('toaki_session')); }
     catch { return null; }
@@ -597,7 +623,30 @@
   }
 
   // ── INIT ──────────────────────────────────────────────────
+  function detectarRecuperacao() {
+    try {
+      const h = (location.hash || '').replace(/^#/, '');
+      if (!h) return false;
+      const p = new URLSearchParams(h);
+      if (p.get('type') === 'recovery' && p.get('access_token')) {
+        recoveryToken = p.get('access_token');
+        // limpar o hash do URL
+        history.replaceState(null, '', location.pathname + location.search);
+        showAuth();
+        document.getElementById('loginForm').style.display = 'none';
+        document.getElementById('registerForm').style.display = 'none';
+        document.getElementById('recoverForm').style.display = 'none';
+        document.getElementById('newPassForm').style.display = 'block';
+        document.getElementById('tabLogin').classList.remove('active');
+        document.getElementById('tabRegister').classList.remove('active');
+        return true;
+      }
+    } catch (e) {}
+    return false;
+  }
+
   async function init() {
+    if (detectarRecuperacao()) return;   // veio de um link de recuperacao
     const session = loadSession();
     if (session?.access_token) {
       // Tenta refrescar para garantir token válido
@@ -719,9 +768,67 @@
   }
 
   // ── AUTH ACTIONS ──────────────────────────────────────────
+  function mostrarRecuperar() {
+    document.getElementById('loginForm').style.display = 'none';
+    document.getElementById('registerForm').style.display = 'none';
+    document.getElementById('newPassForm').style.display = 'none';
+    document.getElementById('recoverForm').style.display = 'block';
+    document.getElementById('tabLogin').classList.remove('active');
+    document.getElementById('tabRegister').classList.remove('active');
+    const rc = document.getElementById('recoverEmail');
+    const le = document.getElementById('loginEmail');
+    if (le && le.value) rc.value = le.value;
+  }
+
+  async function pedirRecuperacao() {
+    const email = document.getElementById('recoverEmail').value.trim();
+    const msg = document.getElementById('recoverMsg');
+    if (!email) { setMsg(msg, 'Escreve o teu email.', 'error'); return; }
+    setMsg(msg, 'A enviar...', '');
+    try {
+      const res = await sbFetch('/auth/v1/recover', {
+        method: 'POST',
+        body: JSON.stringify({ email: email, redirect_to: BASE_URL + 'toaki.html' })
+      });
+      if (res.ok) {
+        setMsg(msg, 'Enviamos um link para o teu email. Verifica a caixa de entrada (e o spam).', 'success');
+      } else {
+        const d = await res.json().catch(() => ({}));
+        setMsg(msg, d.msg || d.error_description || 'Nao foi possivel enviar. Tenta mais tarde.', 'error');
+      }
+    } catch (e) { setMsg(msg, 'Erro de ligacao.', 'error'); }
+  }
+
+  async function definirNovaPassword() {
+    const p1 = document.getElementById('newPass1').value;
+    const p2 = document.getElementById('newPass2').value;
+    const msg = document.getElementById('newPassMsg');
+    if (p1.length < 6) { setMsg(msg, 'Minimo 6 caracteres.', 'error'); return; }
+    if (p1 !== p2) { setMsg(msg, 'As passwords nao coincidem.', 'error'); return; }
+    if (!recoveryToken) { setMsg(msg, 'Sessao de recuperacao invalida. Pede um novo link.', 'error'); return; }
+    setMsg(msg, 'A guardar...', '');
+    try {
+      const res = await fetch(SUPABASE_URL + '/auth/v1/user', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json', 'apikey': SUPABASE_KEY, 'Authorization': 'Bearer ' + recoveryToken },
+        body: JSON.stringify({ password: p1 })
+      });
+      const d = await res.json().catch(() => ({}));
+      if (res.ok) {
+        recoveryToken = null;
+        setMsg(msg, 'Password alterada! Ja podes entrar.', 'success');
+        setTimeout(() => { switchTab('login'); }, 1500);
+      } else {
+        setMsg(msg, d.msg || d.error_description || 'Erro ao guardar a password.', 'error');
+      }
+    } catch (e) { setMsg(msg, 'Erro de ligacao.', 'error'); }
+  }
+
   function switchTab(tab) {
     document.getElementById('loginForm').style.display = tab === 'login' ? 'block' : 'none';
     document.getElementById('registerForm').style.display = tab === 'register' ? 'block' : 'none';
+    document.getElementById('recoverForm').style.display = 'none';
+    document.getElementById('newPassForm').style.display = 'none';
     document.getElementById('tabLogin').className = 'auth-tab' + (tab === 'login' ? ' active' : '');
     document.getElementById('tabRegister').className = 'auth-tab' + (tab === 'register' ? ' active' : '');
     document.getElementById('loginMsg').textContent = '';
