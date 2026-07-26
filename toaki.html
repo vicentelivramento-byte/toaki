@@ -93,6 +93,21 @@
     .prog-tag-open { font-size: 10px; text-transform: uppercase; letter-spacing: 0.06em; color: #2ECC71; }
     .prog-fecho { font-size: 12px; color: var(--muted); margin-bottom: 12px; }
     .prog-fecho.fechada { color: var(--red); }
+    .prog-row { border: 1px solid var(--border); border-radius: 14px; padding: 14px; margin-bottom: 12px; background: var(--surface); transition: border-color .15s; }
+    .prog-row.clic { cursor: pointer; }
+    .prog-row.clic:active { border-color: var(--red); }
+    .prog-row.eu { border-color: var(--red); background: rgba(232,57,42,0.07); box-shadow: 0 0 0 1px rgba(232,57,42,0.15); }
+    .prog-row-head { display: flex; align-items: center; justify-content: space-between; margin-bottom: 10px; }
+    .prog-row-label { font-size: 12px; letter-spacing: 0.06em; }
+    .prog-edit-tag { font-size: 11px; font-weight: 800; letter-spacing: 0.08em; color: var(--red); background: rgba(232,57,42,0.12); padding: 4px 10px; border-radius: 8px; }
+    .prog-cells { display: flex; gap: 8px; }
+    .prog-cell { flex: 1; background: var(--mid); border-radius: 10px; padding: 8px 10px; min-width: 0; }
+    .prog-cell-lbl { font-size: 9px; text-transform: uppercase; letter-spacing: 0.1em; color: var(--muted); margin-bottom: 3px; }
+    .prog-cell-val { font-size: 15px; font-weight: 700; font-family: 'Syne', sans-serif; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .prog-vazia { font-size: 13px; color: var(--muted); font-style: italic; padding: 4px 2px; }
+    .prog-edit { margin-top: 12px; padding-top: 12px; border-top: 1px dashed var(--border); }
+    .prog-in { width: 100%; background: var(--dark); border: 1px solid var(--border); border-radius: 10px; padding: 12px; color: var(--text); font-family: 'DM Sans', sans-serif; font-size: 15px; outline: none; margin-bottom: 8px; }
+    .prog-in:focus { border-color: var(--red); }
 
     /* HISTÓRICO */
     #historyScreen { display: none; flex-direction: column; padding-bottom: 32px; }
@@ -1597,15 +1612,17 @@
     progParts.filter(p => p.grupo_id === grupoId).forEach(p => { ocupadas[p.posicao] = p; });
     const myPhone = progMyPhone();
     const minhasAqui = progMinhas.filter(p => p.grupo_id === grupoId);
-    const meusCreditos = minhasAqui.reduce((a, p) => a + Number(p.creditos || 0), 0);
+    const nOcupadas = Object.keys(ocupadas).length;
+    const quota = nOcupadas > 0 ? Number(g.creditos || 0) / nOcupadas : 0;
     const hodeTxt = (g.hode_min != null) ? (' &middot; hode ' + progFmt(g.hode_min) + '\u2013' + progFmt(g.hode_max) + '\u20AC') : '';
     const nOcup = Object.keys(ocupadas).length;
     let h = '<div class="prog-card"><div class="prog-card-title">' + g.nome + '</div>' +
             '<div class="prog-sub">' + nOcup + '/8 posicoes &middot; ' + progFmt(g.creditos) + ' creditos' + hodeTxt + '</div>';
     if (minhasAqui.length) {
+      const meusCreditos = quota * minhasAqui.length;
       h += '<div class="prog-badges">' +
              '<div class="prog-badge"><div class="prog-badge-val">' + minhasAqui.length + '</div><div class="prog-badge-lbl">Minhas posicoes</div></div>' +
-             '<div class="prog-badge"><div class="prog-badge-val">' + progFmt(meusCreditos) + '</div><div class="prog-badge-lbl">Os meus creditos</div></div>' +
+             '<div class="prog-badge"><div class="prog-badge-val">' + progFmt(meusCreditos) + '\u20AC</div><div class="prog-badge-lbl">Os meus creditos</div></div>' +
            '</div>';
     }
     const souDono = g.criado_por && normalizePhone(g.criado_por) === myPhone;
@@ -1726,38 +1743,41 @@
       const row = progListaRows.find(r => r.posicao === i) || { posicao: i };
       const part = progParts.find(p => p.grupo_id === progListaGrupo && p.posicao === i && p.estado === 'aceite');
       const euDono = part && normalizePhone(part.phone) === myPhone;
-      const aberta = part && part.aberta === true;              // abertura ao nivel do participante
+      const aberta = part && part.aberta === true;
       const editavel = souAceite && !progListaFechada && (euDono || aberta);
       const expandida = progLinhaAberta === i && editavel;
-
       const temDados = row.codigo_jogo || row.prognostico || row.valor != null;
-      const resumo = temDados
-        ? ((row.codigo_jogo ? 'Jogo ' + row.codigo_jogo : '') +
-           (row.prognostico ? (row.codigo_jogo ? ' \u00B7 ' : '') + row.prognostico : '') +
-           (row.valor != null ? ' \u00B7 ' + progFmt(row.valor) + '\u20AC' : ''))
-        : '\u2014';
 
-      // Titulo: so' a minha linha se identifica; as outras sao anonimas (so' o prognostico)
-      const titulo = euDono
-        ? 'A minha posicao' + (aberta ? ' <span class="prog-tag-open">aberta</span>' : '')
-        : (aberta ? '<span class="prog-tag-open">aberta</span>' : '<span style="color:var(--muted)">Prognostico</span>');
+      // Cabecalho da linha (SEM numero de posicao, para nao identificar)
+      let etiqueta;
+      if (euDono) etiqueta = '<span style="color:var(--red);font-weight:700">A MINHA POSICAO</span>' + (aberta ? ' <span class="prog-tag-open">aberta</span>' : '');
+      else if (aberta) etiqueta = '<span class="prog-tag-open">POSICAO ABERTA</span>';
+      else etiqueta = '<span style="color:var(--muted);font-size:11px;letter-spacing:0.08em">PROGNOSTICO</span>';
 
-      html += '<div class="prog-row' + (euDono ? ' eu' : '') + '">' +
-        '<div class="prog-row-top"' + (editavel ? ' style="cursor:pointer" onclick="progToggleLinha(' + i + ')"' : '') + '>' +
-          '<div class="prog-row-name">' +
-            titulo +
-            '<div class="prog-sub" style="margin-top:2px">' + resumo + '</div>' +
-          '</div>' +
-          (editavel ? '<div class="prog-pos-tag" style="color:var(--red)">' + (expandida ? 'Fechar' : 'Editar') + '</div>' : '') +
+      html += '<div class="prog-row' + (euDono ? ' eu' : '') + (editavel ? ' clic' : '') + '"' +
+              (editavel ? ' onclick="progToggleLinha(' + i + ')"' : '') + '>' +
+        '<div class="prog-row-head">' +
+          '<div class="prog-row-label">' + etiqueta + '</div>' +
+          (editavel ? '<div class="prog-edit-tag">' + (expandida ? 'FECHAR' : 'EDITAR') + '</div>' : '') +
         '</div>';
 
+      if (temDados) {
+        html += '<div class="prog-cells">' +
+          '<div class="prog-cell"><div class="prog-cell-lbl">Jogo</div><div class="prog-cell-val">' + (row.codigo_jogo || '\u2014') + '</div></div>' +
+          '<div class="prog-cell" style="flex:2"><div class="prog-cell-lbl">Prognostico</div><div class="prog-cell-val">' + (row.prognostico || '\u2014') + '</div></div>' +
+          '<div class="prog-cell"><div class="prog-cell-lbl">Valor</div><div class="prog-cell-val">' + (row.valor != null ? progFmt(row.valor) + '\u20AC' : '\u2014') + '</div></div>' +
+        '</div>';
+      } else {
+        html += '<div class="prog-vazia">Por preencher</div>';
+      }
+
       if (expandida) {
-        html += '<div style="margin-top:10px">' +
+        html += '<div class="prog-edit" onclick="event.stopPropagation()">' +
           '<input class="prog-in" id="pc_' + i + '" placeholder="Codigo do jogo" value="' + (row.codigo_jogo || '') + '">' +
           '<input class="prog-in" id="pp_' + i + '" placeholder="Prognostico" value="' + (row.prognostico || '') + '">' +
           '<div class="prog-in-row">' +
             '<input class="prog-in" id="pv_' + i + '" inputmode="decimal" placeholder="Valor" value="' + (row.valor != null ? progFmt(row.valor) : '') + '">' +
-            '<button class="prog-btn-sm" style="height:38px" onclick="progGuardarLinha(' + i + ')">Guardar</button>' +
+            '<button class="prog-btn-sm" style="height:42px;padding:0 18px" onclick="progGuardarLinha(' + i + ')">Guardar</button>' +
           '</div>' +
         '</div>';
       }
