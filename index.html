@@ -1,6 +1,20 @@
 <!DOCTYPE html>
 <html lang="pt">
 <head>
+  <script>
+    // Recuperacao de password: se o Supabase mandou o token para a landing,
+    // reencaminha imediatamente para a app (toaki.html) levando o token.
+    (function () {
+      try {
+        var h = window.location.hash || '';
+        var q = window.location.search || '';
+        if ((h.indexOf('type=recovery') !== -1 && h.indexOf('access_token=') !== -1) ||
+            (q.indexOf('type=recovery') !== -1)) {
+          window.location.replace('/toaki.html' + q + h);
+        }
+      } catch (e) {}
+    })();
+  </script>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <meta name="description" content="TÔAKI — Partilha a tua localização em segundos. Sem instalação, sem fricção.">
