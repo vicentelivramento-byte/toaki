@@ -120,6 +120,11 @@
     .prog-edit { margin-top: 12px; padding-top: 12px; border-top: 1px dashed var(--border); }
     .prog-in { width: 100%; background: var(--dark); border: 1px solid var(--border); border-radius: 10px; padding: 12px; color: var(--text); font-family: 'DM Sans', sans-serif; font-size: 15px; outline: none; margin-bottom: 8px; }
     .prog-in:focus { border-color: var(--red); }
+    .pg-grp { margin-bottom: 10px; }
+    .pg-lbl { font-size: 10px; text-transform: uppercase; letter-spacing: 0.09em; color: var(--muted); margin-bottom: 6px; }
+    .pg-btns { display: flex; gap: 6px; flex-wrap: wrap; }
+    .pg-btn { flex: 1; min-width: 44px; padding: 11px 6px; background: var(--mid); border: 1px solid var(--border); border-radius: 10px; color: var(--text); font-family: 'Syne', sans-serif; font-weight: 700; font-size: 14px; cursor: pointer; text-align: center; }
+    .pg-btn.on { background: var(--red); border-color: var(--red); color: #fff; }
 
     /* HISTÓRICO */
     #historyScreen { display: none; flex-direction: column; padding-bottom: 32px; }
@@ -1912,7 +1917,7 @@
       if (expandida) {
         html += '<div class="prog-edit" onclick="event.stopPropagation()">' +
           '<input class="prog-in" id="pc_' + i + '" placeholder="Codigo do jogo" value="' + (row.codigo_jogo || '') + '">' +
-          '<input class="prog-in" id="pp_' + i + '" placeholder="Prognostico" value="' + (row.prognostico || '') + '">' +
+          progBotoesPrognostico(i, row.prognostico || '') +
           '<div class="prog-in-row">' +
             '<input class="prog-in" id="pv_' + i + '" inputmode="decimal" placeholder="Valor" value="' + (row.valor != null ? progFmt(row.valor) : '') + '">' +
             '<button class="prog-btn-sm" style="height:42px;padding:0 18px" onclick="progGuardarLinha(' + i + ')">Guardar</button>' +
@@ -1924,12 +1929,65 @@
     document.getElementById('progListaBody').innerHTML = html;
   }
 
+  // Estado da escolha de prognostico por posicao: {tipo, valor}
+  let progEscolha = {};
+  function progParsePrognostico(txt) {
+    // aceita "TR 1", "INT X", "DV 2", "+/- +", "+/- -"
+    const t = (txt || '').trim().toUpperCase();
+    if (!t) return { tipo: '', valor: '' };
+    if (t.startsWith('+/-') || t.startsWith('+/\u2212')) {
+      return { tipo: '+/-', valor: t.indexOf('-') > 2 || t.indexOf('\u2212') > 2 ? '-' : '+' };
+    }
+    const m = t.match(/^(TR|INT|DV)\s*([1X2])$/);
+    if (m) return { tipo: m[1], valor: m[2] };
+    return { tipo: '', valor: '' };
+  }
+  function progBotoesPrognostico(i, prognostico) {
+    const e = progEscolha[i] || progParsePrognostico(prognostico);
+    progEscolha[i] = e;
+    const tipos = ['TR', 'INT', 'DV', '+/-'];
+    let h = '<div class="pg-grp"><div class="pg-lbl">Tipo</div><div class="pg-btns">';
+    tipos.forEach(tp => {
+      h += '<button class="pg-btn' + (e.tipo === tp ? ' on' : '') + '" onclick="progEscolherTipo(' + i + ',\'' + tp + '\')">' + tp + '</button>';
+    });
+    h += '</div></div>';
+    // valores dependem do tipo
+    const valores = e.tipo === '+/-' ? ['+', '-'] : (e.tipo ? ['1', 'X', '2'] : []);
+    if (valores.length) {
+      h += '<div class="pg-grp"><div class="pg-lbl">Prognostico</div><div class="pg-btns">';
+      valores.forEach(v => {
+        h += '<button class="pg-btn' + (e.valor === v ? ' on' : '') + '" onclick="progEscolherValor(' + i + ',\'' + v + '\')">' + v + '</button>';
+      });
+      h += '</div></div>';
+    }
+    return h;
+  }
+  function progEscolherTipo(i, tp) {
+    const e = progEscolha[i] || { tipo: '', valor: '' };
+    if (e.tipo !== tp) { e.tipo = tp; e.valor = ''; }  // muda tipo -> limpa valor
+    progEscolha[i] = e;
+    progRenderDia();
+    progLinhaAberta = i;  // manter aberta
+    progRenderDia();
+  }
+  function progEscolherValor(i, v) {
+    const e = progEscolha[i] || { tipo: '', valor: '' };
+    e.valor = v; progEscolha[i] = e;
+    progLinhaAberta = i;
+    progRenderDia();
+  }
+  function progPrognosticoTexto(i) {
+    const e = progEscolha[i] || { tipo: '', valor: '' };
+    if (!e.tipo || !e.valor) return '';
+    return e.tipo + ' ' + e.valor;
+  }
+
   async function progGuardarLinha(posicao) {
     const codigo = document.getElementById('pc_' + posicao).value.trim();
-    const prog = document.getElementById('pp_' + posicao).value.trim();
+    const prog = progPrognosticoTexto(posicao);
     const valTxt = document.getElementById('pv_' + posicao).value.trim();
     if (!codigo) { alert('Falta o codigo do jogo.'); return; }
-    if (!prog) { alert('Falta o prognostico.'); return; }
+    if (!prog) { alert('Escolhe o tipo e o prognostico (ex: TR + 1).'); return; }
     if (!valTxt) { alert('Falta o valor.'); return; }
     const valor = progNum(valTxt);
     if (isNaN(valor)) { alert('Valor invalido. Escreve um numero (ex: 2,5).'); return; }
