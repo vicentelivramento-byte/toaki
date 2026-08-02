@@ -1713,32 +1713,32 @@
             '</div>';
     if (progBuscaAberta) {
       html += '<input class="place-input" id="progBusca" placeholder="Escreve o nome da lista..." oninput="renderProg()" value="' + (progBuscaTxt || '') + '">';
-    }
-    const termo = (progBuscaTxt || '').trim().toLowerCase();
-    const disponiveis = progGrupos.filter(g => {
-      const ocup = progParts.filter(p => p.grupo_id === g.id).length;
-      const completa = ocup >= 8;                       // listas cheias nunca aparecem
-      const jaEstou = meusGrupos.indexOf(g.id) >= 0;
-      const bateNome = !termo || (g.nome || '').toLowerCase().indexOf(termo) >= 0;
-      return !completa && !jaEstou && bateNome;
-    });
-    if (!disponiveis.length) {
-      html += '<div class="prog-empty">' + (termo ? 'Nenhuma lista disponivel com esse nome.' : 'Nao ha listas disponiveis.') + '</div>';
-    } else {
-      disponiveis.forEach(g => {
-        if (progGrupoExpandido === g.id) { html += progGrupoCard(g.id, true); return; }
+      const termo = (progBuscaTxt || '').trim().toLowerCase();
+      const disponiveis = progGrupos.filter(g => {
         const ocup = progParts.filter(p => p.grupo_id === g.id).length;
-        const hodeTxt = (g.hode_min != null) ? (' \u00B7 hode ' + progFmt(g.hode_min) + '\u2013' + progFmt(g.hode_max) + '\u20AC') : '';
-        html += '<div class="prog-card" style="padding:12px;cursor:pointer" onclick="progToggleGrupo(' + g.id + ')">' +
-                  '<div style="display:flex;align-items:center;gap:10px">' +
-                    '<div style="flex:1">' +
-                      '<div class="prog-card-title" style="font-size:14px;margin-bottom:2px">' + g.nome + '</div>' +
-                      '<div class="prog-sub">' + (8 - ocup) + ' posicoes livres' + hodeTxt + '</div>' +
-                    '</div>' +
-                    '<div class="prog-pos-tag" style="color:var(--red)">Ver</div>' +
-                  '</div>' +
-                '</div>';
+        const completa = ocup >= 8;                       // listas cheias nunca aparecem
+        const jaEstou = meusGrupos.indexOf(g.id) >= 0;
+        const bateNome = !termo || (g.nome || '').toLowerCase().indexOf(termo) >= 0;
+        return !completa && !jaEstou && bateNome;
       });
+      if (!disponiveis.length) {
+        html += '<div class="prog-empty">' + (termo ? 'Nenhuma lista disponivel com esse nome.' : 'Nao ha listas disponiveis.') + '</div>';
+      } else {
+        disponiveis.forEach(g => {
+          if (progGrupoExpandido === g.id) { html += progGrupoCard(g.id, true); return; }
+          const ocup = progParts.filter(p => p.grupo_id === g.id).length;
+          const hodeTxt = (g.hode_min != null) ? (' \u00B7 hode ' + progFmt(g.hode_min) + '\u2013' + progFmt(g.hode_max) + '\u20AC') : '';
+          html += '<div class="prog-card" style="padding:12px;cursor:pointer" onclick="progToggleGrupo(' + g.id + ')">' +
+                    '<div style="display:flex;align-items:center;gap:10px">' +
+                      '<div style="flex:1">' +
+                        '<div class="prog-card-title" style="font-size:14px;margin-bottom:2px">' + g.nome + '</div>' +
+                        '<div class="prog-sub">' + (8 - ocup) + ' posicoes livres' + hodeTxt + '</div>' +
+                      '</div>' +
+                      '<div class="prog-pos-tag" style="color:var(--red)">Ver</div>' +
+                    '</div>' +
+                  '</div>';
+        });
+      }
     }
 
     if (progIsAdmin) html += progAdminPanel();
