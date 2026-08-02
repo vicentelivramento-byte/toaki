@@ -1661,6 +1661,7 @@
 
   let progBuscaTxt = '';
   let progGrupoExpandido = null;
+  let progBuscaAberta = false;
   // configura aqui as instrucoes de pagamento MB WAY (numero/chave a preencher)
   const MBWAY_INFO = 'PREENCHER: numero MB WAY';
 
@@ -1703,8 +1704,16 @@
     }
 
     // ----- Procurar listas disponiveis (com posicoes livres) -----
-    html += '<div class="section-label" style="margin:16px 4px 6px">Procurar listas disponiveis</div>';
-    html += '<input class="place-input" id="progBusca" placeholder="Procurar lista pelo nome..." oninput="renderProg()" value="' + (progBuscaTxt || '') + '">';
+    html += '<div style="display:flex;align-items:center;justify-content:space-between;margin:16px 4px 6px">' +
+              '<div class="section-label" style="margin:0">Listas disponiveis</div>' +
+              '<button onclick="progAbrirBusca()" style="background:transparent;border:none;color:var(--red);cursor:pointer;display:flex;align-items:center;gap:5px;font-size:12px;font-family:\'Syne\',sans-serif;font-weight:700">' +
+                '<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><circle cx="11" cy="11" r="7"/><path d="M21 21l-4.3-4.3"/></svg>' +
+                (progBuscaAberta ? 'Fechar' : 'Procurar') +
+              '</button>' +
+            '</div>';
+    if (progBuscaAberta) {
+      html += '<input class="place-input" id="progBusca" placeholder="Escreve o nome da lista..." oninput="renderProg()" value="' + (progBuscaTxt || '') + '">';
+    }
     const termo = (progBuscaTxt || '').trim().toLowerCase();
     const disponiveis = progGrupos.filter(g => {
       const ocup = progParts.filter(p => p.grupo_id === g.id).length;
@@ -1736,6 +1745,12 @@
     box.innerHTML = html;
   }
 
+  function progAbrirBusca() {
+    progBuscaAberta = !progBuscaAberta;
+    if (!progBuscaAberta) progBuscaTxt = '';
+    renderProg();
+    if (progBuscaAberta) { const el = document.getElementById('progBusca'); if (el) el.focus(); }
+  }
   function progToggleGrupo(id) {
     progGrupoExpandido = (progGrupoExpandido === id) ? null : id;
     renderProg();
