@@ -893,6 +893,19 @@
     if (password.length < 6) { setMsg(msg, 'Password com mínimo 6 caracteres.', 'error'); return; }
     if (!document.getElementById('regTerms').checked) { setMsg(msg, 'Deves aceitar os Termos e a Política de Privacidade.', 'error'); return; }
 
+    // Verificar telefone duplicado (impede registar com numero de outra pessoa)
+    if (phone) {
+      setMsg(msg, 'A verificar...', '');
+      try {
+        const chk = await fetch(SUPABASE_URL + '/rest/v1/profiles?phone=eq.' + encodeURIComponent(phone) + '&select=id', { headers: { 'apikey': SUPABASE_KEY } });
+        const existentes = await chk.json();
+        if (Array.isArray(existentes) && existentes.length > 0) {
+          setMsg(msg, 'Este número de telefone já está associado a outra conta.', 'error');
+          return;
+        }
+      } catch (e) { /* se a verificacao falhar, o indice unico na BD trava na mesma */ }
+    }
+
     setMsg(msg, 'A criar conta...', '');
     const res = await sbFetch('/auth/v1/signup', {
       method: 'POST',
@@ -911,6 +924,13 @@
             'Prefer': 'return=minimal'
           },
           body: JSON.stringify({ id: data.user.id, name, phone })
+        }).then(async r => {
+          if (!r.ok) {
+            const t = await r.text();
+            if (t.indexOf('duplicate') >= 0 || t.indexOf('profiles_phone_unico') >= 0) {
+              setMsg(msg, 'Este número já está associado a outra conta.', 'error');
+            }
+          }
         });
       }
       // Guardar telefone localmente
@@ -1652,7 +1672,10 @@
         progProntas = Array.isArray(prt) ? prt : [];
         progRegistadas = Array.isArray(reg) ? reg : [];
       }
-      progMinhas = progParts.filter(p => normalizePhone(p.phone) === myPhone);
+      const myId = currentUser?.id || null;
+      progMinhas = myId
+        ? progParts.filter(p => p.user_id === myId)
+        : [];
       renderProg();
     } catch (e) {
       box.innerHTML = '<div class="prog-empty">Erro ao carregar. Verifica a ligacao.</div>';
@@ -1762,6 +1785,7 @@
     const ocupadas = {};
     progParts.filter(p => p.grupo_id === grupoId).forEach(p => { ocupadas[p.posicao] = p; });
     const myPhone = progMyPhone();
+    const myId = currentUser?.id || null;
     const minhasAqui = progMinhas.filter(p => p.grupo_id === grupoId);
     const nOcupadas = Object.keys(ocupadas).length;
     const quota = nOcupadas > 0 ? Number(g.creditos || 0) / nOcupadas : 0;
@@ -1780,7 +1804,7 @@
     for (let i = 1; i <= 8; i++) {
       const p = ocupadas[i];
       if (p) {
-        const eu = normalizePhone(p.phone) === myPhone;
+        const eu = (myId && p.user_id === myId);
         const euPendente = eu && p.estado === 'pendente';
         const euAceite = eu && p.estado === 'aceite';
         let acao;
@@ -2280,7 +2304,7 @@
     try {
       const res = await fetch(SUPABASE_URL + '/rest/v1/rpc/prog_criar_grupo', {
         method: 'POST', headers: progHeaders(),
-        body: JSON.stringify({ p_nome: nome, p_hode_id: hodeId, p_phone: myPhone, p_participante_nome: userName || 'Participante' })
+        body: JSON.stringify({ p_nome: nome, p_hode_id: hodeId, p_phone: myPhone, p_participante_nome: userName || 'Participante', p_user_id: currentUser?.id || null })
       });
       if (res.ok) { showToast('\u2713 Lista criada! A aguardar aceitacao.', 'success'); loadProg(); }
       else { showToast('Erro ao criar a lista.', 'error'); }
@@ -2313,7 +2337,7 @@
       const res = await fetch(SUPABASE_URL + '/rest/v1/prog_participantes', {
         method: 'POST',
         headers: Object.assign(progHeaders(), { 'Prefer': 'return=minimal' }),
-        body: JSON.stringify({ grupo_id: grupoId, posicao: posicao, phone: myPhone, nome: userName || 'Participante', estado: 'pendente' })
+        body: JSON.stringify({ grupo_id: grupoId, posicao: posicao, phone: myPhone, nome: userName || 'Participante', estado: 'pendente', user_id: currentUser?.id || null })
       });
       if (res.ok) { showToast('\u2713 Inscricao enviada!', 'success'); loadProg(); }
       else { const t = await res.text(); showToast(t.indexOf('duplicate') >= 0 ? 'Posicao ja ocupada.' : 'Erro ao inscrever.', 'error'); loadProg(); }
