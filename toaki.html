@@ -59,6 +59,18 @@
     .nav-tab { flex: 1; padding: 12px 8px; text-align: center; font-family: 'Syne', sans-serif; font-size: 13px; font-weight: 600; color: var(--muted); border: none; background: transparent; cursor: pointer; border-bottom: 2px solid transparent; transition: all 0.2s; margin-bottom: -1px; }
     .nav-tab.active { color: var(--text); border-bottom-color: var(--red); }
     #progScreen { display: none; flex-direction: column; padding: 16px; gap: 12px; }
+    .lp-ov { display: none; position: fixed; inset: 0; background: var(--dark); z-index: 700; overflow-y: auto; }
+    .lp-ov.open { display: block; }
+    .lp-head { position: sticky; top: 0; background: var(--dark); border-bottom: 1px solid var(--border); padding: 16px; display: flex; align-items: center; gap: 12px; z-index: 2; }
+    .lp-title { font-family: 'Syne', sans-serif; font-size: 17px; font-weight: 800; flex: 1; }
+    .lp-close { background: transparent; border: 1px solid var(--border); color: var(--text); border-radius: 10px; width: 36px; height: 36px; font-size: 17px; cursor: pointer; }
+    .lp-body { padding: 16px; max-width: 640px; margin: 0 auto; }
+    .lp-row { display: grid; grid-template-columns: 40px 1fr 1fr auto; gap: 10px; align-items: center; padding: 14px 12px; border: 1px solid var(--border); border-radius: 12px; margin-bottom: 10px; background: var(--surface); }
+    .lp-num { width: 34px; height: 34px; border-radius: 9px; background: var(--red); color: #fff; display: flex; align-items: center; justify-content: center; font-family: 'Syne', sans-serif; font-weight: 800; font-size: 15px; }
+    .lp-cell-lbl { font-size: 9px; text-transform: uppercase; letter-spacing: 0.09em; color: var(--muted); margin-bottom: 2px; }
+    .lp-cell-val { font-family: 'Syne', sans-serif; font-weight: 700; font-size: 17px; }
+    .lp-val { font-family: 'Syne', sans-serif; font-weight: 800; font-size: 16px; color: var(--red); white-space: nowrap; }
+    .lp-copy { width: 100%; padding: 14px; background: var(--mid); border: 1px solid var(--border); border-radius: 12px; color: var(--text); font-family: 'Syne', sans-serif; font-weight: 700; font-size: 14px; cursor: pointer; margin-top: 8px; }
     .prog-card { background: var(--surface); border: 1px solid var(--border); border-radius: 16px; padding: 16px; }
     .prog-card-title { font-family: 'Syne', sans-serif; font-size: 16px; font-weight: 700; margin-bottom: 4px; }
     .prog-sub { font-size: 12px; color: var(--muted); }
@@ -108,6 +120,11 @@
     .prog-edit { margin-top: 12px; padding-top: 12px; border-top: 1px dashed var(--border); }
     .prog-in { width: 100%; background: var(--dark); border: 1px solid var(--border); border-radius: 10px; padding: 12px; color: var(--text); font-family: 'DM Sans', sans-serif; font-size: 15px; outline: none; margin-bottom: 8px; }
     .prog-in:focus { border-color: var(--red); }
+    .pg-grp { margin-bottom: 10px; }
+    .pg-lbl { font-size: 10px; text-transform: uppercase; letter-spacing: 0.09em; color: var(--muted); margin-bottom: 6px; }
+    .pg-btns { display: flex; gap: 6px; flex-wrap: wrap; }
+    .pg-btn { flex: 1; min-width: 44px; padding: 11px 6px; background: var(--mid); border: 1px solid var(--border); border-radius: 10px; color: var(--text); font-family: 'Syne', sans-serif; font-weight: 700; font-size: 14px; cursor: pointer; text-align: center; }
+    .pg-btn.on { background: var(--red); border-color: var(--red); color: #fff; }
 
     /* HISTÓRICO */
     #historyScreen { display: none; flex-direction: column; padding-bottom: 32px; }
@@ -526,6 +543,18 @@
     <div id="placePicked" style="display:none;font-size:13px;color:#2ECC71;margin-bottom:10px"></div>
     <button class="modal-btn" id="savePlaceBtn" onclick="saveNewPlace()" disabled style="opacity:0.5">Guardar local</button>
     <button class="modal-btn-cancel" onclick="closeAddPlace()">Cancelar</button>
+  </div>
+</div>
+
+<div class="lp-ov" id="listaProntaOverlay">
+  <div class="lp-head">
+    <button class="lp-close" onclick="fecharListaPronta()">&#10005;</button>
+    <div class="lp-title" id="lpTitulo">Lista pronta</div>
+  </div>
+  <div class="lp-body">
+    <div class="prog-sub" id="lpSub" style="margin-bottom:14px"></div>
+    <div id="lpBody"></div>
+    <button class="lp-copy" onclick="copiarListaPronta()">Copiar lista (texto)</button>
   </div>
 </div>
 
@@ -1888,7 +1917,7 @@
       if (expandida) {
         html += '<div class="prog-edit" onclick="event.stopPropagation()">' +
           '<input class="prog-in" id="pc_' + i + '" placeholder="Codigo do jogo" value="' + (row.codigo_jogo || '') + '">' +
-          '<input class="prog-in" id="pp_' + i + '" placeholder="Prognostico" value="' + (row.prognostico || '') + '">' +
+          progBotoesPrognostico(i, row.prognostico || '') +
           '<div class="prog-in-row">' +
             '<input class="prog-in" id="pv_' + i + '" inputmode="decimal" placeholder="Valor" value="' + (row.valor != null ? progFmt(row.valor) : '') + '">' +
             '<button class="prog-btn-sm" style="height:42px;padding:0 18px" onclick="progGuardarLinha(' + i + ')">Guardar</button>' +
@@ -1900,12 +1929,65 @@
     document.getElementById('progListaBody').innerHTML = html;
   }
 
+  // Estado da escolha de prognostico por posicao: {tipo, valor}
+  let progEscolha = {};
+  function progParsePrognostico(txt) {
+    // aceita "TR 1", "INT X", "DV 2", "+/- +", "+/- -"
+    const t = (txt || '').trim().toUpperCase();
+    if (!t) return { tipo: '', valor: '' };
+    if (t.startsWith('+/-') || t.startsWith('+/\u2212')) {
+      return { tipo: '+/-', valor: t.indexOf('-') > 2 || t.indexOf('\u2212') > 2 ? '-' : '+' };
+    }
+    const m = t.match(/^(TR|INT|DV)\s*([1X2])$/);
+    if (m) return { tipo: m[1], valor: m[2] };
+    return { tipo: '', valor: '' };
+  }
+  function progBotoesPrognostico(i, prognostico) {
+    const e = progEscolha[i] || progParsePrognostico(prognostico);
+    progEscolha[i] = e;
+    const tipos = ['TR', 'INT', 'DV', '+/-'];
+    let h = '<div class="pg-grp"><div class="pg-lbl">Tipo</div><div class="pg-btns">';
+    tipos.forEach(tp => {
+      h += '<button class="pg-btn' + (e.tipo === tp ? ' on' : '') + '" onclick="progEscolherTipo(' + i + ',\'' + tp + '\')">' + tp + '</button>';
+    });
+    h += '</div></div>';
+    // valores dependem do tipo
+    const valores = e.tipo === '+/-' ? ['+', '-'] : (e.tipo ? ['1', 'X', '2'] : []);
+    if (valores.length) {
+      h += '<div class="pg-grp"><div class="pg-lbl">Prognostico</div><div class="pg-btns">';
+      valores.forEach(v => {
+        h += '<button class="pg-btn' + (e.valor === v ? ' on' : '') + '" onclick="progEscolherValor(' + i + ',\'' + v + '\')">' + v + '</button>';
+      });
+      h += '</div></div>';
+    }
+    return h;
+  }
+  function progEscolherTipo(i, tp) {
+    const e = progEscolha[i] || { tipo: '', valor: '' };
+    if (e.tipo !== tp) { e.tipo = tp; e.valor = ''; }  // muda tipo -> limpa valor
+    progEscolha[i] = e;
+    progRenderDia();
+    progLinhaAberta = i;  // manter aberta
+    progRenderDia();
+  }
+  function progEscolherValor(i, v) {
+    const e = progEscolha[i] || { tipo: '', valor: '' };
+    e.valor = v; progEscolha[i] = e;
+    progLinhaAberta = i;
+    progRenderDia();
+  }
+  function progPrognosticoTexto(i) {
+    const e = progEscolha[i] || { tipo: '', valor: '' };
+    if (!e.tipo || !e.valor) return '';
+    return e.tipo + ' ' + e.valor;
+  }
+
   async function progGuardarLinha(posicao) {
     const codigo = document.getElementById('pc_' + posicao).value.trim();
-    const prog = document.getElementById('pp_' + posicao).value.trim();
+    const prog = progPrognosticoTexto(posicao);
     const valTxt = document.getElementById('pv_' + posicao).value.trim();
     if (!codigo) { alert('Falta o codigo do jogo.'); return; }
-    if (!prog) { alert('Falta o prognostico.'); return; }
+    if (!prog) { alert('Escolhe o tipo e o prognostico (ex: TR + 1).'); return; }
     if (!valTxt) { alert('Falta o valor.'); return; }
     const valor = progNum(valTxt);
     if (isNaN(valor)) { alert('Valor invalido. Escreve um numero (ex: 2,5).'); return; }
@@ -1947,6 +2029,38 @@
 
   // ===== ADMIN: registar / terminar com foto e creditos =====
   let progAdminLista = null, progAdminAcao = null, progAdminFotoUrl = null;
+
+  let lpDados = [];
+  async function verListaPronta(listaId, nome, data) {
+    document.getElementById('lpTitulo').textContent = nome || 'Lista pronta';
+    document.getElementById('lpSub').textContent = data ? ('Data: ' + data) : '';
+    const body = document.getElementById('lpBody');
+    body.innerHTML = '<div class="prog-empty"><div class="spinner"></div></div>';
+    document.getElementById('listaProntaOverlay').classList.add('open');
+    try {
+      const rows = await fetch(SUPABASE_URL + '/rest/v1/prog_prognosticos?lista_id=eq.' + listaId + '&order=posicao.asc&select=posicao,codigo_jogo,prognostico,valor', { headers: progHeaders() }).then(r => r.json());
+      lpDados = rows || [];
+      let h = '';
+      lpDados.forEach(r => {
+        h += '<div class="lp-row">' +
+               '<div class="lp-num">' + r.posicao + '</div>' +
+               '<div><div class="lp-cell-lbl">Codigo do jogo</div><div class="lp-cell-val">' + (r.codigo_jogo || '\u2014') + '</div></div>' +
+               '<div><div class="lp-cell-lbl">Prognostico</div><div class="lp-cell-val">' + (r.prognostico || '\u2014') + '</div></div>' +
+               '<div class="lp-val">' + (r.valor != null ? progFmt(r.valor) + '\u20AC' : '') + '</div>' +
+             '</div>';
+      });
+      body.innerHTML = h || '<div class="prog-empty">Sem linhas.</div>';
+    } catch (e) { body.innerHTML = '<div class="prog-empty">Erro ao carregar.</div>'; }
+  }
+  function fecharListaPronta() {
+    document.getElementById('listaProntaOverlay').classList.remove('open');
+  }
+  function copiarListaPronta() {
+    const linhas = lpDados.map(r => r.posicao + ') ' + (r.codigo_jogo||'-') + ' ' + (r.prognostico||'-') + (r.valor!=null? ' '+progFmt(r.valor)+'EUR':''));
+    const txt = linhas.join('\n');
+    if (navigator.clipboard) { navigator.clipboard.writeText(txt).then(()=>showToast('\u2713 Lista copiada!','success')).catch(()=>showToast('Nao foi possivel copiar','error')); }
+    else showToast('Copia nao suportada','error');
+  }
 
   async function progAdminAbrir(listaId, acao) {
     progAdminLista = listaId; progAdminAcao = acao; progAdminFotoUrl = null;
@@ -2088,6 +2202,7 @@
     progProntas.forEach(l => {
       h += '<div class="prog-pos" style="margin-top:8px">' +
              '<div class="prog-pos-name">' + l.grupo_nome + '<div class="prog-sub">' + l.data + '</div></div>' +
+             '<button class="prog-btn-sm" style="background:var(--mid);border:1px solid var(--border);margin-right:6px" onclick="verListaPronta(' + l.id + ',\'' + (l.grupo_nome||'') + '\',\'' + l.data + '\')">Ver lista</button>' +
              '<button class="prog-btn-sm" onclick="progAdminAbrir(' + l.id + ',\'registar\')">Registar</button>' +
            '</div>';
     });
