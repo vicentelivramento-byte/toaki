@@ -1,423 +1,2273 @@
 <!DOCTYPE html>
 <html lang="pt">
 <head>
-  <script>
-    // Recuperacao de password: se o Supabase mandou o token para a landing,
-    // reencaminha imediatamente para a app (toaki.html) levando o token.
-    (function () {
-      try {
-        var h = window.location.hash || '';
-        var q = window.location.search || '';
-        if ((h.indexOf('type=recovery') !== -1 && h.indexOf('access_token=') !== -1) ||
-            (q.indexOf('type=recovery') !== -1)) {
-          window.location.replace('/toaki.html' + q + h);
-        }
-      } catch (e) {}
-    })();
-  </script>
   <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <meta name="description" content="TÔAKI — Partilha a tua localização em segundos. Sem instalação, sem fricção.">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <meta name="mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <meta name="apple-mobile-web-app-title" content="TÔAKI">
   <meta name="theme-color" content="#111110">
-  <meta property="og:title" content="TÔAKI — Diz onde estás">
-  <meta property="og:description" content="Partilha a tua localização com foto em segundos. Sem instalação.">
-  <meta property="og:image" content="icon-512.png">
-  <title>TÔAKI — Diz onde estás</title>
-  <link rel="icon" href="icon-192.png">
-  <link href="https://fonts.googleapis.com/css2?family=Syne:wght@400;700;800&family=DM+Sans:wght@300;400;500&display=swap" rel="stylesheet">
+  <link rel="manifest" href="manifest.json">
+  <link rel="apple-touch-icon" href="icon-192.png">
+  <title>TÔAKI</title>
+  <link href="https://fonts.googleapis.com/css2?family=Syne:wght@400;500;600;700;800&family=DM+Sans:wght@300;400;500&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.css">
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.js"></script>
   <style>
     :root {
-      --red: #E8392A;
-      --dark: #111110;
-      --mid: #1A1A18;
-      --surface: #222220;
-      --border: rgba(255,255,255,0.07);
-      --text: #F5F4F0;
-      --muted: #777772;
+      --red: #E8392A; --dark: #111110; --mid: #1E1E1C;
+      --surface: #252523; --border: rgba(255,255,255,0.08);
+      --text: #F5F4F0; --muted: #888884; --green: #2ECC71;
     }
-    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
-    html { scroll-behavior: smooth; }
-    body {
-      background: var(--dark);
-      color: var(--text);
-      font-family: 'DM Sans', sans-serif;
-      font-size: 16px;
-      line-height: 1.6;
-      overflow-x: hidden;
-    }
+    * { box-sizing: border-box; margin: 0; padding: 0; -webkit-tap-highlight-color: transparent; }
+    body { background: var(--dark); color: var(--text); font-family: 'DM Sans', sans-serif; min-height: 100dvh; display: flex; flex-direction: column; max-width: 430px; margin: 0 auto; overflow-x: hidden; }
 
-    /* NAV */
-    nav {
-      position: fixed; top: 0; left: 0; right: 0; z-index: 100;
-      display: flex; align-items: center; justify-content: space-between;
-      padding: 20px 40px;
-      background: rgba(17,17,16,0.85);
-      backdrop-filter: blur(20px);
-      border-bottom: 1px solid var(--border);
-    }
-    .nav-logo {
-      font-family: 'Syne', sans-serif;
-      font-weight: 800; font-size: 22px;
-      letter-spacing: 0.08em;
-      display: flex; align-items: center; gap: 6px;
-      text-decoration: none; color: var(--text);
-    }
-    .nav-dot { width: 8px; height: 8px; background: var(--red); border-radius: 50%; animation: pulse 2s infinite; }
-    .nav-cta {
-      background: var(--red); color: #fff;
-      border: none; border-radius: 100px;
-      padding: 10px 24px;
-      font-family: 'Syne', sans-serif; font-weight: 700; font-size: 14px;
-      cursor: pointer; text-decoration: none;
-      transition: opacity 0.2s, transform 0.2s;
-    }
-    .nav-cta:hover { opacity: 0.88; transform: scale(0.98); }
+    /* AUTH SCREEN */
+    #authScreen { display: flex; flex-direction: column; align-items: center; justify-content: center; min-height: 100dvh; padding: 32px 24px; }
+    .auth-logo { font-family: 'Syne', sans-serif; font-size: 36px; font-weight: 800; letter-spacing: 0.08em; display: flex; align-items: center; gap: 8px; margin-bottom: 8px; }
+    .auth-logo-dot { width: 10px; height: 10px; background: var(--red); border-radius: 50%; animation: pulse 2s infinite; }
+    .auth-sub { font-size: 13px; color: var(--muted); margin-bottom: 40px; }
+    .auth-tabs { display: flex; background: var(--surface); border-radius: 12px; padding: 4px; margin-bottom: 24px; width: 100%; }
+    .auth-tab { flex: 1; padding: 10px; text-align: center; font-family: 'Syne', sans-serif; font-size: 13px; font-weight: 600; border-radius: 8px; cursor: pointer; transition: all 0.2s; color: var(--muted); border: none; background: transparent; }
+    .auth-tab.active { background: var(--red); color: #fff; }
+    .auth-form { width: 100%; }
+    .auth-field { margin-bottom: 14px; }
+    .auth-field label { font-size: 10px; color: var(--muted); text-transform: uppercase; letter-spacing: 0.1em; display: block; margin-bottom: 6px; }
+    .auth-field input { width: 100%; background: var(--surface); border: 1px solid var(--border); border-radius: 12px; padding: 14px 16px; color: var(--text); font-family: 'DM Sans', sans-serif; font-size: 15px; outline: none; transition: border-color 0.2s; }
+    .auth-field input:focus { border-color: rgba(232,57,42,0.5); }
+    .auth-btn { width: 100%; padding: 16px; background: var(--red); border: none; border-radius: 14px; color: #fff; font-family: 'Syne', sans-serif; font-size: 15px; font-weight: 700; letter-spacing: 0.05em; cursor: pointer; margin-top: 8px; transition: opacity 0.2s; }
+    .auth-btn:disabled { opacity: 0.5; cursor: not-allowed; }
+    .auth-msg { font-size: 12px; color: var(--muted); text-align: center; margin-top: 16px; min-height: 18px; }
+    .auth-msg.error { color: var(--red); }
+    .auth-msg.success { color: var(--green); }
 
-    /* HERO */
-    .hero {
-      min-height: 100vh;
-      display: flex; flex-direction: column;
-      align-items: center; justify-content: center;
-      text-align: center;
-      padding: 120px 24px 80px;
-      position: relative; overflow: hidden;
-    }
-    .hero::before {
-      content: '';
-      position: absolute; inset: 0;
-      background: radial-gradient(ellipse 80% 60% at 50% 0%, rgba(232,57,42,0.12) 0%, transparent 70%);
-      pointer-events: none;
-    }
-    .hero-badge {
-      display: inline-flex; align-items: center; gap: 8px;
-      background: rgba(232,57,42,0.12);
-      border: 1px solid rgba(232,57,42,0.25);
-      border-radius: 100px; padding: 6px 16px;
-      font-size: 13px; color: #ff6b5e;
-      margin-bottom: 36px;
-      animation: fadeUp 0.6s ease both;
-    }
-    .hero-badge-dot { width: 6px; height: 6px; background: var(--red); border-radius: 50%; animation: pulse 2s infinite; }
-    .hero-title {
-      font-family: 'Syne', sans-serif; font-weight: 800;
-      font-size: clamp(52px, 10vw, 96px);
-      line-height: 0.95; letter-spacing: -0.02em;
-      margin-bottom: 24px;
-      animation: fadeUp 0.6s 0.1s ease both;
-    }
-    .hero-title span { color: var(--red); }
-    .hero-sub {
-      font-size: clamp(16px, 2.5vw, 20px);
-      color: var(--muted); max-width: 480px;
-      line-height: 1.5; margin-bottom: 48px;
-      animation: fadeUp 0.6s 0.2s ease both;
-    }
-    .hero-actions {
-      display: flex; gap: 12px; align-items: center; flex-wrap: wrap; justify-content: center;
-      animation: fadeUp 0.6s 0.3s ease both;
-    }
-    .btn-primary {
-      background: var(--red); color: #fff;
-      border: none; border-radius: 14px;
-      padding: 16px 32px;
-      font-family: 'Syne', sans-serif; font-weight: 700; font-size: 16px;
-      cursor: pointer; text-decoration: none;
-      display: inline-flex; align-items: center; gap: 10px;
-      transition: opacity 0.2s, transform 0.15s;
-    }
-    .btn-primary:hover { opacity: 0.88; transform: scale(0.98); }
-    .btn-ghost {
-      background: transparent; color: var(--muted);
-      border: 1px solid var(--border); border-radius: 14px;
-      padding: 16px 28px;
-      font-family: 'Syne', sans-serif; font-weight: 600; font-size: 15px;
-      cursor: pointer; text-decoration: none;
-      transition: color 0.2s, border-color 0.2s;
-    }
-    .btn-ghost:hover { color: var(--text); border-color: rgba(255,255,255,0.2); }
-    .hero-note { font-size: 12px; color: var(--muted); margin-top: 20px; animation: fadeUp 0.6s 0.4s ease both; }
+    /* APP */
+    #appScreen { display: none; flex-direction: column; }
+    header { display: flex; align-items: center; justify-content: space-between; padding: 52px 20px 16px; background: var(--dark); position: sticky; top: 0; z-index: 100; border-bottom: 1px solid var(--border); }
+    .logo { font-family: 'Syne', sans-serif; font-size: 22px; font-weight: 800; letter-spacing: 0.08em; display: flex; align-items: center; gap: 6px; }
+    .logo-dot { width: 8px; height: 8px; background: var(--red); border-radius: 50%; animation: pulse 2s infinite; }
+    @keyframes pulse { 0%, 100% { transform: scale(1); opacity: 1; } 50% { transform: scale(1.4); opacity: 0.7; } }
+    .header-sub { font-size: 11px; color: var(--muted); letter-spacing: 0.05em; }
+    .header-right { display: flex; align-items: center; gap: 8px; }
+    .profile-btn { width: 36px; height: 36px; border-radius: 50%; background: rgba(232,57,42,0.15); color: var(--red); border: none; font-family: 'Syne', sans-serif; font-size: 14px; font-weight: 700; cursor: pointer; display: flex; align-items: center; justify-content: center; }
+    .logout-btn { width: 32px; height: 32px; border-radius: 50%; background: transparent; color: var(--muted); border: 1px solid var(--border); cursor: pointer; display: flex; align-items: center; justify-content: center; font-size: 14px; transition: all 0.15s; }
+    .logout-btn:hover { color: var(--red); border-color: var(--red); }
 
-    /* MOCKUP */
-    .hero-mockup {
-      margin-top: 64px; position: relative;
-      animation: fadeUp 0.8s 0.4s ease both;
-      max-width: 320px; width: 100%;
-    }
-    .mockup-phone {
-      background: var(--mid); border: 1px solid var(--border);
-      border-radius: 32px; padding: 20px 16px;
-      box-shadow: 0 60px 120px rgba(0,0,0,0.6), 0 0 0 1px rgba(255,255,255,0.04);
-    }
-    .mockup-screen {
-      background: var(--dark); border-radius: 20px; overflow: hidden;
-      padding: 16px;
-    }
-    .mockup-header {
-      display: flex; align-items: center; justify-content: space-between;
-      margin-bottom: 14px;
-    }
-    .mockup-logo { font-family: 'Syne', sans-serif; font-weight: 800; font-size: 16px; letter-spacing: 0.06em; }
-    .mockup-avatar { width: 28px; height: 28px; border-radius: 50%; background: rgba(232,57,42,0.2); display: flex; align-items: center; justify-content: center; font-size: 11px; font-weight: 700; color: var(--red); font-family: 'Syne', sans-serif; }
-    .mockup-map { background: #1a2030; border-radius: 12px; height: 120px; margin-bottom: 12px; position: relative; overflow: hidden; display: flex; align-items: center; justify-content: center; }
-    .mockup-map-bg { position: absolute; inset: 0; opacity: 0.3;
-      background-image: repeating-linear-gradient(0deg, rgba(255,255,255,0.03) 0, rgba(255,255,255,0.03) 1px, transparent 1px, transparent 40px),
-        repeating-linear-gradient(90deg, rgba(255,255,255,0.03) 0, rgba(255,255,255,0.03) 1px, transparent 1px, transparent 40px); }
-    .mockup-pin { width: 28px; height: 28px; position: relative; z-index: 1; }
-    .mockup-pin-body { fill: var(--red); }
-    .mockup-badge { position: absolute; bottom: 8px; left: 8px; right: 8px; background: rgba(17,17,16,0.9); border-radius: 8px; padding: 6px 10px; display: flex; align-items: center; gap: 6px; }
-    .mockup-badge-dot { width: 6px; height: 6px; background: var(--red); border-radius: 50%; flex-shrink: 0; }
-    .mockup-badge-text { font-size: 10px; color: var(--muted); }
-    .mockup-contact { background: var(--surface); border-radius: 10px; padding: 10px 12px; display: flex; align-items: center; gap: 10px; margin-bottom: 8px; }
-    .mockup-contact-av { width: 32px; height: 32px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 11px; font-weight: 700; font-family: 'Syne', sans-serif; flex-shrink: 0; }
-    .mockup-contact-info { flex: 1; }
-    .mockup-contact-name { font-size: 12px; font-weight: 500; color: var(--text); }
-    .mockup-contact-num { font-size: 10px; color: var(--muted); }
-    .mockup-check { width: 18px; height: 18px; border-radius: 50%; display: flex; align-items: center; justify-content: center; }
-    .mockup-send { background: var(--red); border-radius: 10px; padding: 11px; text-align: center; font-family: 'Syne', sans-serif; font-weight: 700; font-size: 12px; color: #fff; margin-top: 4px; }
+    /* TABS DE NAVEGAÇÃO */
+    .nav-tabs { display: flex; padding: 0 16px 0; gap: 0; border-bottom: 1px solid var(--border); background: var(--dark); }
+    .nav-tab { flex: 1; padding: 12px 8px; text-align: center; font-family: 'Syne', sans-serif; font-size: 13px; font-weight: 600; color: var(--muted); border: none; background: transparent; cursor: pointer; border-bottom: 2px solid transparent; transition: all 0.2s; margin-bottom: -1px; }
+    .nav-tab.active { color: var(--text); border-bottom-color: var(--red); }
+    #progScreen { display: none; flex-direction: column; padding: 16px; gap: 12px; }
+    .lp-ov { display: none; position: fixed; inset: 0; background: var(--dark); z-index: 700; overflow-y: auto; }
+    .lp-ov.open { display: block; }
+    .lp-head { position: sticky; top: 0; background: var(--dark); border-bottom: 1px solid var(--border); padding: 16px; display: flex; align-items: center; gap: 12px; z-index: 2; }
+    .lp-title { font-family: 'Syne', sans-serif; font-size: 17px; font-weight: 800; flex: 1; }
+    .lp-close { background: transparent; border: 1px solid var(--border); color: var(--text); border-radius: 10px; width: 36px; height: 36px; font-size: 17px; cursor: pointer; }
+    .lp-body { padding: 16px; max-width: 640px; margin: 0 auto; }
+    .lp-row { display: grid; grid-template-columns: 40px 1fr 1fr auto; gap: 10px; align-items: center; padding: 14px 12px; border: 1px solid var(--border); border-radius: 12px; margin-bottom: 10px; background: var(--surface); }
+    .lp-num { width: 34px; height: 34px; border-radius: 9px; background: var(--red); color: #fff; display: flex; align-items: center; justify-content: center; font-family: 'Syne', sans-serif; font-weight: 800; font-size: 15px; }
+    .lp-cell-lbl { font-size: 9px; text-transform: uppercase; letter-spacing: 0.09em; color: var(--muted); margin-bottom: 2px; }
+    .lp-cell-val { font-family: 'Syne', sans-serif; font-weight: 700; font-size: 17px; }
+    .lp-val { font-family: 'Syne', sans-serif; font-weight: 800; font-size: 16px; color: var(--red); white-space: nowrap; }
+    .lp-copy { width: 100%; padding: 14px; background: var(--mid); border: 1px solid var(--border); border-radius: 12px; color: var(--text); font-family: 'Syne', sans-serif; font-weight: 700; font-size: 14px; cursor: pointer; margin-top: 8px; }
+    .prog-card { background: var(--surface); border: 1px solid var(--border); border-radius: 16px; padding: 16px; }
+    .prog-card-title { font-family: 'Syne', sans-serif; font-size: 16px; font-weight: 700; margin-bottom: 4px; }
+    .prog-sub { font-size: 12px; color: var(--muted); }
+    .prog-badges { display: flex; gap: 10px; margin-top: 12px; }
+    .prog-badge { flex: 1; background: var(--mid); border: 1px solid var(--border); border-radius: 12px; padding: 10px; text-align: center; }
+    .prog-badge-val { font-family: 'Syne', sans-serif; font-size: 18px; font-weight: 800; color: var(--red); }
+    .prog-badge-lbl { font-size: 10px; color: var(--muted); text-transform: uppercase; letter-spacing: 0.08em; margin-top: 2px; }
+    .prog-pos { display: flex; align-items: center; gap: 10px; padding: 10px 12px; border: 1px solid var(--border); border-radius: 10px; margin-top: 8px; }
+    .prog-pos.livre { cursor: pointer; border-style: dashed; }
+    .prog-pos.livre:active { background: rgba(232,57,42,0.08); }
+    .prog-pos.minha { border-color: var(--red); background: rgba(232,57,42,0.06); }
+    .prog-pos-num { width: 26px; height: 26px; border-radius: 8px; background: var(--mid); display: flex; align-items: center; justify-content: center; font-family: 'Syne', sans-serif; font-size: 12px; font-weight: 700; flex-shrink: 0; }
+    .prog-pos-name { flex: 1; font-size: 13px; }
+    .prog-pos-tag { font-size: 10px; text-transform: uppercase; letter-spacing: 0.06em; color: var(--muted); }
+    .prog-btn { width: 100%; padding: 12px; background: var(--red); border: none; border-radius: 12px; color: #fff; font-family: 'Syne', sans-serif; font-size: 14px; font-weight: 700; cursor: pointer; margin-top: 10px; }
+    .prog-btn-sm { padding: 8px 14px; background: var(--red); border: none; border-radius: 10px; color: #fff; font-family: 'Syne', sans-serif; font-size: 12px; font-weight: 700; cursor: pointer; }
+    .prog-admin { border-color: rgba(46,204,113,0.3); background: rgba(46,204,113,0.05); }
+    .prog-empty { text-align: center; padding: 40px 20px; color: var(--muted); font-size: 13px; }
+    .prog-ov { display: none; position: fixed; inset: 0; background: var(--dark); z-index: 600; overflow-y: auto; }
+    .prog-ov.open { display: block; }
+    .prog-ov-head { position: sticky; top: 0; background: var(--dark); border-bottom: 1px solid var(--border); padding: 16px; display: flex; align-items: center; gap: 12px; z-index: 2; }
+    .prog-ov-title { font-family: 'Syne', sans-serif; font-size: 17px; font-weight: 800; flex: 1; }
+    .prog-ov-close { background: transparent; border: 1px solid var(--border); color: var(--text); border-radius: 10px; width: 34px; height: 34px; font-size: 16px; cursor: pointer; }
+    .prog-ov-body { padding: 16px; max-width: 560px; margin: 0 auto; }
+    .prog-row { border: 1px solid var(--border); border-radius: 12px; padding: 12px; margin-bottom: 10px; background: var(--surface); }
+    .prog-row.eu { border-color: var(--red); background: rgba(232,57,42,0.05); }
+    .prog-row-top { display: flex; align-items: center; gap: 10px; margin-bottom: 10px; }
+    .prog-row-name { flex: 1; font-size: 13px; font-weight: 600; }
+    .prog-in { width: 100%; background: var(--mid); border: 1px solid var(--border); border-radius: 9px; padding: 10px; color: var(--text); font-family: 'DM Sans', sans-serif; font-size: 13px; outline: none; margin-bottom: 8px; }
+    .prog-in:disabled { opacity: 0.55; }
+    .prog-in-row { display: flex; gap: 8px; }
+    .prog-tag-open { font-size: 10px; text-transform: uppercase; letter-spacing: 0.06em; color: #2ECC71; }
+    .prog-fecho { font-size: 12px; color: var(--muted); margin-bottom: 12px; }
+    .prog-fecho.fechada { color: var(--red); }
+    .prog-row { border: 1px solid var(--border); border-radius: 14px; padding: 14px; margin-bottom: 12px; background: var(--surface); transition: border-color .15s; }
+    .prog-row.clic { cursor: pointer; }
+    .prog-row.clic:active { border-color: var(--red); }
+    .prog-row.eu { border-color: var(--red); background: rgba(232,57,42,0.07); box-shadow: 0 0 0 1px rgba(232,57,42,0.15); }
+    .prog-row-head { display: flex; align-items: center; justify-content: space-between; margin-bottom: 10px; }
+    .prog-row-label { font-size: 12px; letter-spacing: 0.06em; }
+    .prog-edit-tag { font-size: 11px; font-weight: 800; letter-spacing: 0.08em; color: var(--red); background: rgba(232,57,42,0.12); padding: 4px 10px; border-radius: 8px; }
+    .prog-cells { display: flex; gap: 8px; }
+    .prog-cell { flex: 1; background: var(--mid); border-radius: 10px; padding: 8px 10px; min-width: 0; }
+    .prog-cell-lbl { font-size: 9px; text-transform: uppercase; letter-spacing: 0.1em; color: var(--muted); margin-bottom: 3px; }
+    .prog-cell-val { font-size: 15px; font-weight: 700; font-family: 'Syne', sans-serif; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .prog-vazia { font-size: 13px; color: var(--muted); font-style: italic; padding: 4px 2px; }
+    .prog-edit { margin-top: 12px; padding-top: 12px; border-top: 1px dashed var(--border); }
+    .prog-in { width: 100%; background: var(--dark); border: 1px solid var(--border); border-radius: 10px; padding: 12px; color: var(--text); font-family: 'DM Sans', sans-serif; font-size: 15px; outline: none; margin-bottom: 8px; }
+    .prog-in:focus { border-color: var(--red); }
 
-    /* SECTIONS */
-    section { padding: 100px 24px; max-width: 1100px; margin: 0 auto; }
-    .section-label { font-size: 11px; font-weight: 600; color: var(--red); text-transform: uppercase; letter-spacing: 0.15em; margin-bottom: 16px; }
-    .section-title { font-family: 'Syne', sans-serif; font-weight: 800; font-size: clamp(32px, 5vw, 52px); line-height: 1.05; margin-bottom: 16px; }
-    .section-sub { font-size: 17px; color: var(--muted); max-width: 520px; line-height: 1.6; }
-
-    /* COMO FUNCIONA */
-    .steps { display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 2px; margin-top: 64px; }
-    .step { background: var(--mid); padding: 40px 32px; position: relative; overflow: hidden; }
-    .step:first-child { border-radius: 20px 0 0 20px; }
-    .step:last-child { border-radius: 0 20px 20px 0; }
-    .step-num { font-family: 'Syne', sans-serif; font-weight: 800; font-size: 72px; color: rgba(255,255,255,0.04); position: absolute; top: 16px; right: 20px; line-height: 1; }
-    .step-icon { width: 48px; height: 48px; background: rgba(232,57,42,0.12); border-radius: 14px; display: flex; align-items: center; justify-content: center; margin-bottom: 20px; font-size: 22px; }
-    .step-title { font-family: 'Syne', sans-serif; font-weight: 700; font-size: 18px; margin-bottom: 8px; }
-    .step-desc { font-size: 14px; color: var(--muted); line-height: 1.6; }
-
-    /* FEATURES */
-    .features { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 1px; margin-top: 64px; background: var(--border); border-radius: 20px; overflow: hidden; }
-    .feature { background: var(--mid); padding: 36px 28px; transition: background 0.2s; }
-    .feature:hover { background: #1e1e1c; }
-    .feature-icon { font-size: 28px; margin-bottom: 16px; }
-    .feature-title { font-family: 'Syne', sans-serif; font-weight: 700; font-size: 16px; margin-bottom: 8px; }
-    .feature-desc { font-size: 13px; color: var(--muted); line-height: 1.6; }
-
-    /* CASOS */
-    .casos { display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 16px; margin-top: 64px; }
-    .caso { border: 1px solid var(--border); border-radius: 20px; padding: 32px 28px; transition: border-color 0.2s; }
-    .caso:hover { border-color: rgba(232,57,42,0.3); }
-    .caso-emoji { font-size: 36px; margin-bottom: 20px; }
-    .caso-title { font-family: 'Syne', sans-serif; font-weight: 700; font-size: 18px; margin-bottom: 10px; }
-    .caso-desc { font-size: 14px; color: var(--muted); line-height: 1.6; }
-
-    /* CTA FINAL */
-    .cta-section {
-      text-align: center; padding: 120px 24px;
-      background: var(--mid);
-      border-top: 1px solid var(--border);
-      border-bottom: 1px solid var(--border);
-    }
-    .cta-section .section-title { margin: 0 auto 16px; max-width: 600px; }
-    .cta-section .section-sub { margin: 0 auto 48px; }
-    .trust-items { display: flex; justify-content: center; flex-wrap: wrap; gap: 24px; margin-top: 32px; }
-    .trust-item { display: flex; align-items: center; gap: 8px; font-size: 13px; color: var(--muted); }
-    .trust-check { width: 18px; height: 18px; border-radius: 50%; background: rgba(46,204,113,0.15); color: #2ECC71; display: flex; align-items: center; justify-content: center; font-size: 10px; flex-shrink: 0; }
-
-    /* FOOTER */
-    footer { padding: 40px 40px; display: flex; align-items: center; justify-content: space-between; flex-wrap: gap; border-top: 1px solid var(--border); }
-    .footer-logo { font-family: 'Syne', sans-serif; font-weight: 800; font-size: 18px; letter-spacing: 0.06em; }
-    .footer-links { display: flex; gap: 24px; }
-    .footer-links a { font-size: 13px; color: var(--muted); text-decoration: none; transition: color 0.2s; }
-    .footer-links a:hover { color: var(--text); }
-    .footer-copy { font-size: 12px; color: var(--muted); }
-
-    /* ANIMATIONS */
-    @keyframes pulse { 0%,100%{transform:scale(1);opacity:1} 50%{transform:scale(1.4);opacity:0.7} }
-    @keyframes fadeUp { from{opacity:0;transform:translateY(20px)} to{opacity:1;transform:translateY(0)} }
-
-    /* RESPONSIVE */
-    @media (max-width: 640px) {
-      nav { padding: 16px 20px; }
-      .hero-title { font-size: 48px; }
-      .step:first-child { border-radius: 20px 20px 0 0; }
-      .step:last-child { border-radius: 0 0 20px 20px; }
-      .steps { gap: 1px; grid-template-columns: 1fr; }
-      footer { flex-direction: column; gap: 20px; text-align: center; padding: 32px 20px; }
-      .footer-links { flex-wrap: wrap; justify-content: center; }
-    }
+    /* HISTÓRICO */
+    #historyScreen { display: none; flex-direction: column; padding-bottom: 32px; }
+    .history-tabs { display: flex; background: var(--surface); border-radius: 12px; padding: 4px; margin: 16px 16px 0; }
+    .history-tab { flex: 1; padding: 9px; text-align: center; font-family: 'Syne', sans-serif; font-size: 12px; font-weight: 600; border-radius: 8px; cursor: pointer; transition: all 0.2s; color: var(--muted); border: none; background: transparent; }
+    .history-tab.active { background: var(--red); color: #fff; }
+    .history-list { padding: 12px 16px 0; display: flex; flex-direction: column; gap: 10px; }
+    .history-item { background: var(--surface); border: 1px solid var(--border); border-radius: 14px; padding: 14px; display: flex; gap: 12px; cursor: pointer; transition: all 0.15s; }
+    .history-item:active { opacity: 0.8; }
+    .history-avatar { width: 40px; height: 40px; border-radius: 50%; background: rgba(232,57,42,0.15); color: var(--red); display: flex; align-items: center; justify-content: center; font-family: 'Syne', sans-serif; font-size: 14px; font-weight: 700; flex-shrink: 0; }
+    .history-info { flex: 1; min-width: 0; }
+    .history-name { font-size: 14px; font-weight: 600; color: var(--text); }
+    .history-detail { font-size: 11px; color: var(--muted); margin-top: 2px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .history-time { font-size: 10px; color: var(--muted); flex-shrink: 0; margin-top: 2px; }
+    .history-thumb { width: 44px; height: 44px; border-radius: 8px; object-fit: cover; flex-shrink: 0; }
+    .history-empty { text-align: center; padding: 60px 20px; color: var(--muted); font-size: 13px; }
+    .history-empty-icon { font-size: 36px; margin-bottom: 12px; }
+    .map-wrap { position: relative; margin: 16px; border-radius: 16px; overflow: hidden; height: 200px; background: var(--surface); border: 1px solid var(--border); }
+    #mapContainer { width: 100%; height: 100%; }
+    .loading-map { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 12px; height: 100%; color: var(--muted); font-size: 12px; }
+    .spinner { width: 24px; height: 24px; border: 2px solid var(--border); border-top-color: var(--red); border-radius: 50%; animation: spin 0.8s linear infinite; }
+    @keyframes spin { to { transform: rotate(360deg); } }
+    .location-badge { position: absolute; bottom: 10px; left: 10px; right: 10px; background: rgba(17,17,16,0.92); backdrop-filter: blur(12px); border: 1px solid var(--border); border-radius: 10px; padding: 8px 12px; display: flex; align-items: center; gap: 8px; }
+    .location-badge .pin { width: 8px; height: 8px; background: var(--red); border-radius: 50%; flex-shrink: 0; animation: pulse 2s infinite; }
+    .location-text { flex: 1; font-size: 12px; color: var(--text); }
+    .section { padding: 0 16px; margin-bottom: 16px; }
+    .section-label { font-size: 10px; font-weight: 500; color: var(--muted); text-transform: uppercase; letter-spacing: 0.1em; margin-bottom: 10px; }
+    .msg-box { background: var(--surface); border: 1px solid var(--border); border-radius: 12px; padding: 12px 14px; display: flex; align-items: flex-start; gap: 10px; transition: border-color 0.2s; }
+    .msg-box:focus-within { border-color: rgba(232,57,42,0.4); }
+    .msg-icon { margin-top: 2px; opacity: 0.4; flex-shrink: 0; }
+    textarea { background: transparent; border: none; outline: none; color: var(--text); font-family: 'DM Sans', sans-serif; font-size: 14px; width: 100%; resize: none; line-height: 1.5; min-height: 44px; }
+    textarea::placeholder { color: var(--muted); }
+    .char-count { text-align: right; font-size: 10px; color: var(--muted); margin-top: 4px; }
+    .photo-area { margin: 0 16px 16px; }
+    .photo-btn { width: 100%; padding: 12px; background: var(--surface); border: 1px dashed var(--border); border-radius: 12px; color: var(--muted); font-family: 'DM Sans', sans-serif; font-size: 13px; cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 10px; transition: all 0.15s; }
+    .photo-btn:hover { border-color: var(--red); color: var(--red); }
+    .photo-preview { position: relative; border-radius: 12px; overflow: hidden; margin-top: 8px; }
+    .photo-preview img { width: 100%; height: 160px; object-fit: cover; display: block; border-radius: 12px; }
+    .photo-remove { position: absolute; top: 8px; right: 8px; width: 28px; height: 28px; background: rgba(0,0,0,0.7); border: none; border-radius: 50%; color: #fff; cursor: pointer; display: flex; align-items: center; justify-content: center; font-size: 16px; }
+    .contacts-list { display: flex; flex-direction: column; gap: 6px; }
+    .contact-item { display: flex; align-items: center; gap: 12px; padding: 10px 14px; background: var(--surface); border: 1px solid var(--border); border-radius: 12px; cursor: pointer; transition: all 0.15s; user-select: none; }
+    .contact-item.selected { border-color: var(--red); background: rgba(232,57,42,0.08); }
+    .avatar { width: 36px; height: 36px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 13px; font-weight: 600; font-family: 'Syne', sans-serif; flex-shrink: 0; }
+    .contact-info { flex: 1; }
+    .contact-name { font-size: 14px; font-weight: 500; color: var(--text); }
+    .contact-phone { font-size: 11px; color: var(--muted); margin-top: 1px; }
+    .check-circle { width: 22px; height: 22px; border-radius: 50%; border: 1.5px solid var(--border); display: flex; align-items: center; justify-content: center; flex-shrink: 0; transition: all 0.15s; }
+    .contact-item.selected .check-circle { background: var(--red); border-color: var(--red); }
+    .check-circle svg { opacity: 0; transition: opacity 0.15s; }
+    .contact-item.selected .check-circle svg { opacity: 1; }
+    .add-contact { display: flex; align-items: center; gap: 12px; padding: 10px 14px; border: 1px dashed var(--border); border-radius: 12px; cursor: pointer; color: var(--muted); font-size: 13px; transition: all 0.15s; margin-top: 6px; }
+    .add-contact:hover { border-color: var(--red); color: var(--red); }
+    .send-wrap { padding: 16px; padding-bottom: 32px; }
+    .send-btn { width: 100%; padding: 16px; background: var(--red); border: none; border-radius: 14px; color: #fff; font-family: 'Syne', sans-serif; font-size: 15px; font-weight: 700; letter-spacing: 0.05em; cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 10px; transition: all 0.15s; }
+    .send-btn:active { transform: scale(0.98); opacity: 0.9; }
+    .send-btn:disabled { opacity: 0.35; cursor: not-allowed; }
+    .send-badge { background: rgba(255,255,255,0.2); border-radius: 20px; padding: 2px 10px; font-size: 12px; }
+    .modal-overlay { position: fixed; inset: 0; background: rgba(0,0,0,0.7); backdrop-filter: blur(6px); z-index: 200; display: flex; align-items: flex-end; opacity: 0; pointer-events: none; transition: opacity 0.2s; }
+    .modal-overlay.open { opacity: 1; pointer-events: all; }
+    .modal { background: var(--mid); border-radius: 20px 20px 0 0; padding: 24px 20px 40px; width: 100%; transform: translateY(100%); transition: transform 0.3s cubic-bezier(0.32, 0.72, 0, 1); border-top: 1px solid var(--border); }
+    .modal-overlay.open .modal { transform: translateY(0); }
+    .modal-handle { width: 36px; height: 4px; background: var(--border); border-radius: 2px; margin: 0 auto 20px; }
+    .modal-title { font-family: 'Syne', sans-serif; font-size: 18px; font-weight: 700; margin-bottom: 20px; }
+    .field { margin-bottom: 14px; }
+    .field label { font-size: 11px; color: var(--muted); text-transform: uppercase; letter-spacing: 0.08em; display: block; margin-bottom: 6px; }
+    .field input { width: 100%; background: var(--surface); border: 1px solid var(--border); border-radius: 10px; padding: 12px 14px; color: var(--text); font-family: 'DM Sans', sans-serif; font-size: 15px; outline: none; transition: border-color 0.2s; }
+    .field input:focus { border-color: rgba(232,57,42,0.5); }
+    .modal-btn { width: 100%; padding: 14px; background: var(--red); border: none; border-radius: 12px; color: #fff; font-family: 'Syne', sans-serif; font-size: 15px; font-weight: 700; cursor: pointer; margin-top: 8px; }
+    .danger-zone { margin-top: 24px; padding-top: 20px; border-top: 1px solid var(--border); }
+    .danger-zone .danger-label { font-size: 10px; color: var(--muted); text-transform: uppercase; letter-spacing: 0.1em; margin-bottom: 12px; }
+    .danger-btn { width: 100%; padding: 13px; background: transparent; border: 1px solid var(--red); border-radius: 12px; color: var(--red); font-family: 'Syne', sans-serif; font-size: 14px; font-weight: 700; cursor: pointer; }
+    .danger-btn:active { background: rgba(232,57,42,0.12); }
+    .delete-warn { font-size: 14px; color: var(--text); line-height: 1.55; margin-bottom: 10px; }
+    .delete-list { font-size: 13px; color: var(--muted); line-height: 1.7; margin: 0 0 20px; padding-left: 18px; }
+    .modal-btn-danger { width: 100%; padding: 14px; background: var(--red); border: none; border-radius: 12px; color: #fff; font-family: 'Syne', sans-serif; font-size: 15px; font-weight: 700; cursor: pointer; }
+    .modal-btn-danger:disabled { opacity: 0.6; }
+    .modal-btn-cancel { width: 100%; padding: 14px; background: transparent; border: 1px solid var(--border); border-radius: 12px; color: var(--text); font-family: 'Syne', sans-serif; font-size: 15px; font-weight: 600; cursor: pointer; margin-top: 10px; }
+    .loc-selector { display: flex; align-items: center; gap: 12px; background: var(--surface); border: 1px solid var(--border); border-radius: 14px; padding: 14px; cursor: pointer; }
+    .loc-selector:active { opacity: 0.85; }
+    .loc-sel-icon { width: 38px; height: 38px; border-radius: 10px; background: rgba(232,57,42,0.12); color: var(--red); display: flex; align-items: center; justify-content: center; flex-shrink: 0; }
+    .loc-name { font-size: 14px; font-weight: 600; color: var(--text); }
+    .loc-sub { font-size: 11px; color: var(--muted); margin-top: 2px; }
+    .loc-change { font-size: 12px; color: var(--red); font-weight: 700; font-family: 'Syne', sans-serif; }
+    .place-item { display: flex; align-items: center; gap: 12px; padding: 12px; border: 1px solid var(--border); border-radius: 12px; margin-bottom: 8px; cursor: pointer; }
+    .place-item.sel { border-color: var(--red); background: rgba(232,57,42,0.06); }
+    .place-item-name { font-size: 14px; font-weight: 600; flex: 1; }
+    .place-del { color: var(--muted); font-size: 18px; padding: 0 6px; }
+    .place-result { padding: 12px; border-bottom: 1px solid var(--border); cursor: pointer; font-size: 13px; line-height: 1.4; }
+    .place-input { width: 100%; background: var(--surface); border: 1px solid var(--border); border-radius: 10px; padding: 12px; color: var(--text); font-family: 'DM Sans', sans-serif; font-size: 14px; outline: none; margin-bottom: 10px; }
+    .toast { position: fixed; bottom: 100px; left: 20px; right: 20px; background: var(--surface); border: 1px solid var(--border); border-radius: 12px; padding: 14px 18px; font-size: 13px; text-align: center; z-index: 300; opacity: 0; transform: translateY(10px); transition: all 0.3s; pointer-events: none; }
+    .toast.show { opacity: 1; transform: translateY(0); }
+    .toast.success { border-color: rgba(46,204,113,0.4); color: var(--green); }
+    .toast.error { border-color: rgba(232,57,42,0.4); color: var(--red); }
+    .av-1 { background: rgba(232,57,42,0.15); color: #E8392A; }
+    .av-2 { background: rgba(46,204,113,0.12); color: #2ECC71; }
+    .av-3 { background: rgba(52,152,219,0.12); color: #3498DB; }
+    .av-4 { background: rgba(241,196,15,0.12); color: #F1C40F; }
+    .av-5 { background: rgba(155,89,182,0.12); color: #9B59B6; }
   </style>
 </head>
 <body>
 
-<!-- NAV -->
-<nav>
-  <a href="#" class="nav-logo">TÔAKI <div class="nav-dot"></div></a>
-  <a href="https://vicentelivramento-byte.github.io/toaki/toaki.html" class="nav-cta">Abrir a app</a>
-</nav>
+<!-- ECRÃ DE AUTENTICAÇÃO -->
+<div id="authScreen">
+  <div class="auth-logo">TÔAKI <div class="auth-logo-dot"></div></div>
+  <div class="auth-sub">Diz onde estás</div>
 
-<!-- HERO -->
-<section class="hero" style="max-width:100%;padding-left:24px;padding-right:24px">
-  <div class="hero-badge">
-    <div class="hero-badge-dot"></div>
-    Localização em tempo real
+  <div class="auth-tabs">
+    <button class="auth-tab active" id="tabLogin" onclick="switchTab('login')">Entrar</button>
+    <button class="auth-tab" id="tabRegister" onclick="switchTab('register')">Registar</button>
   </div>
-  <h1 class="hero-title">Diz onde<br><span>estás.</span></h1>
-  <p class="hero-sub">Partilha a tua localização com foto numa questão de segundos. Sem instalação, sem conta obrigatória para quem recebe.</p>
-  <div class="hero-actions">
-    <a href="https://vicentelivramento-byte.github.io/toaki/toaki.html" class="btn-primary">
-      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/></svg>
-      Abrir o TÔAKI
-    </a>
-    <a href="#como-funciona" class="btn-ghost">Como funciona</a>
-  </div>
-  <p class="hero-note">Grátis para começar · Sem instalação obrigatória</p>
 
-  <!-- MOCKUP -->
-  <div class="hero-mockup">
-    <div class="mockup-phone">
-      <div class="mockup-screen">
-        <div class="mockup-header">
-          <div class="mockup-logo">TÔAKI <span style="color:var(--red)">•</span></div>
-          <div class="mockup-avatar">V</div>
-        </div>
-        <div class="mockup-map">
-          <div class="mockup-map-bg"></div>
-          <svg class="mockup-pin" viewBox="0 0 24 24"><path class="mockup-pin-body" d="M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7z"/><circle cx="12" cy="9" r="2.5" fill="#111110"/><circle cx="12" cy="9" r="1.1" fill="#E8392A"/></svg>
-          <div class="mockup-badge">
-            <div class="mockup-badge-dot"></div>
-            <div class="mockup-badge-text">32.68677, -17.10558</div>
-          </div>
-        </div>
-        <div class="mockup-contact">
-          <div class="mockup-contact-av" style="background:rgba(232,57,42,0.15);color:#E8392A">C</div>
-          <div class="mockup-contact-info">
-            <div class="mockup-contact-name">Carina</div>
-            <div class="mockup-contact-num">+351 963 972 876</div>
-          </div>
-          <div class="mockup-check" style="background:var(--red)">
-            <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="3"><polyline points="20 6 9 17 4 12"/></svg>
-          </div>
-        </div>
-        <div class="mockup-send">📍 Enviar localização</div>
-      </div>
+  <div class="auth-form" id="loginForm">
+    <div class="auth-field">
+      <label>Email</label>
+      <input type="email" id="loginEmail" placeholder="o.teu@email.com" autocomplete="email">
     </div>
+    <div class="auth-field">
+      <label>Password</label>
+      <input type="password" id="loginPassword" placeholder="••••••••" autocomplete="current-password">
+    </div>
+    <button class="auth-btn" onclick="doLogin()">Entrar</button>
+    <div style="text-align:center;margin-top:12px"><a onclick="mostrarRecuperar()" style="color:var(--muted);font-size:13px;cursor:pointer;text-decoration:underline">Esqueci-me da password</a></div>
+    <div class="auth-msg" id="loginMsg"></div>
   </div>
-</section>
 
-<!-- COMO FUNCIONA -->
-<section id="como-funciona">
-  <div class="section-label">Como funciona</div>
-  <h2 class="section-title">Simples como<br>deve ser.</h2>
-  <p class="section-sub">Três passos. Sem tutoriais, sem fricção.</p>
-  <div class="steps">
-    <div class="step">
-      <div class="step-num">1</div>
-      <div class="step-icon">📍</div>
-      <div class="step-title">Abre o TÔAKI</div>
-      <p class="step-desc">Sem instalação obrigatória. Abre no browser, a localização GPS é detetada automaticamente.</p>
+  <div class="auth-form" id="recoverForm" style="display:none">
+    <div class="auth-field">
+      <label>Email da conta</label>
+      <input type="email" id="recoverEmail" placeholder="o.teu@email.com" autocomplete="email">
     </div>
-    <div class="step">
-      <div class="step-num">2</div>
-      <div class="step-icon">👥</div>
-      <div class="step-title">Escolhe os contactos</div>
-      <p class="step-desc">Seleciona quem queres notificar. Adiciona da tua lista de contactos ou manualmente.</p>
-    </div>
-    <div class="step">
-      <div class="step-num">3</div>
-      <div class="step-icon">🔔</div>
-      <div class="step-title">Recebem a notificação</div>
-      <p class="step-desc">Os contactos recebem uma notificação push ou mensagem WhatsApp com o teu mapa e foto.</p>
-    </div>
+    <button class="auth-btn" onclick="pedirRecuperacao()">Enviar link de recuperacao</button>
+    <div style="text-align:center;margin-top:12px"><a onclick="switchTab('login')" style="color:var(--muted);font-size:13px;cursor:pointer;text-decoration:underline">Voltar a entrar</a></div>
+    <div class="auth-msg" id="recoverMsg"></div>
   </div>
-</section>
 
-<!-- FEATURES -->
-<section id="features" style="padding-top:0">
-  <div class="section-label">Funcionalidades</div>
-  <h2 class="section-title">Tudo o que<br>precisas.</h2>
-  <p class="section-sub">Construído para ser rápido, fiável e respeitador da privacidade.</p>
-  <div class="features">
-    <div class="feature">
-      <div class="feature-icon">📍</div>
-      <div class="feature-title">GPS de alta precisão</div>
-      <p class="feature-desc">Localização exata com mapa interativo. O destinatário vê exatamente onde estás.</p>
+  <div class="auth-form" id="newPassForm" style="display:none">
+    <div style="text-align:center;color:var(--muted);font-size:13px;margin-bottom:14px">Define a tua nova password.</div>
+    <div class="auth-field">
+      <label>Nova password (minimo 6)</label>
+      <input type="password" id="newPass1" placeholder="••••••••">
     </div>
-    <div class="feature">
-      <div class="feature-icon">📸</div>
-      <div class="feature-title">Foto do local</div>
-      <p class="feature-desc">Envia uma foto juntamente com a localização. Vale mais do que mil palavras.</p>
+    <div class="auth-field">
+      <label>Confirmar password</label>
+      <input type="password" id="newPass2" placeholder="••••••••">
     </div>
-    <div class="feature">
-      <div class="feature-icon">🔔</div>
-      <div class="feature-title">Notificações push</div>
-      <p class="feature-desc">O destinatário recebe uma notificação instantânea mesmo com o browser fechado.</p>
-    </div>
-    <div class="feature">
-      <div class="feature-icon">💬</div>
-      <div class="feature-title">Mensagem personalizada</div>
-      <p class="feature-desc">Adiciona uma mensagem à localização. "Estou aqui, vem ter comigo!"</p>
-    </div>
-    <div class="feature">
-      <div class="feature-icon">📋</div>
-      <div class="feature-title">Histórico de envios</div>
-      <p class="feature-desc">Consulta todas as localizações enviadas e recebidas, com data e hora.</p>
-    </div>
-    <div class="feature">
-      <div class="feature-icon">🔒</div>
-      <div class="feature-title">Privacidade primeiro</div>
-      <p class="feature-desc">A localização só é partilhada quando tu envias. Sem rastreamento contínuo.</p>
-    </div>
+    <button class="auth-btn" onclick="definirNovaPassword()">Guardar password</button>
+    <div class="auth-msg" id="newPassMsg"></div>
   </div>
-</section>
 
-<!-- CASOS DE USO -->
-<section id="casos" style="padding-top:0">
-  <div class="section-label">Para quem</div>
-  <h2 class="section-title">Para todas as<br>situações.</h2>
-  <p class="section-sub">Do dia-a-dia ao trabalho, o TÔAKI adapta-se.</p>
-  <div class="casos">
-    <div class="caso">
-      <div class="caso-emoji">👨‍👩‍👧</div>
-      <div class="caso-title">Família</div>
-      <p class="caso-desc">Avisa onde estacionaste, confirma que chegaste bem, coordena o encontro nas compras.</p>
+  <div class="auth-form" id="registerForm" style="display:none">
+    <div class="auth-field">
+      <label>O teu nome</label>
+      <input type="text" id="regName" placeholder="ex: Vicente" autocomplete="name">
     </div>
-    <div class="caso">
-      <div class="caso-emoji">🎉</div>
-      <div class="caso-title">Amigos e eventos</div>
-      <p class="caso-desc">Encontra-te com amigos num festival lotado. "Estou aqui, junto ao palco principal."</p>
+    <div class="auth-field">
+      <label>Telemóvel (com indicativo)</label>
+      <input type="tel" id="regPhone" placeholder="351912345678" autocomplete="tel">
     </div>
-    <div class="caso">
-      <div class="caso-emoji">💼</div>
-      <div class="caso-title">Trabalho</div>
-      <p class="caso-desc">Confirma chegada a clientes, coordena equipas em campo, partilha localização de serviço.</p>
+    <div class="auth-field">
+      <label>Email</label>
+      <input type="email" id="regEmail" placeholder="o.teu@email.com" autocomplete="email">
     </div>
-  </div>
-</section>
-
-<!-- CTA FINAL -->
-<div class="cta-section">
-  <div class="section-label" style="text-align:center">Começa agora</div>
-  <h2 class="section-title">Pronto para<br>dizer onde estás?</h2>
-  <p class="section-sub" style="margin:0 auto 48px">Abre o TÔAKI no teu browser. Sem instalação, sem cartão de crédito.</p>
-  <a href="https://vicentelivramento-byte.github.io/toaki/toaki.html" class="btn-primary" style="font-size:17px;padding:18px 40px">
-    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/></svg>
-    Abrir o TÔAKI gratuitamente
-  </a>
-  <div class="trust-items">
-    <div class="trust-item"><div class="trust-check">✓</div>Sem instalação obrigatória</div>
-    <div class="trust-item"><div class="trust-check">✓</div>Grátis para começar</div>
-    <div class="trust-item"><div class="trust-check">✓</div>Sem rastreamento contínuo</div>
-    <div class="trust-item"><div class="trust-check">✓</div>Funciona em qualquer browser</div>
+    <div class="auth-field">
+      <label>Password (mínimo 6 caracteres)</label>
+      <input type="password" id="regPassword" placeholder="••••••••" autocomplete="new-password">
+    </div>
+    <div class="auth-field" style="display:flex;align-items:flex-start;gap:10px;margin-bottom:6px">
+      <input type="checkbox" id="regTerms" style="width:18px;height:18px;margin-top:2px;accent-color:var(--red);flex-shrink:0;cursor:pointer">
+      <label for="regTerms" style="font-size:12px;color:var(--muted);line-height:1.5;cursor:pointer">
+        Li e aceito os <a href="termos.html" target="_blank" style="color:var(--red)">Termos de Utilização</a> e a <a href="privacidade.html" target="_blank" style="color:var(--red)">Política de Privacidade</a>
+      </label>
+    </div>
+    <button class="auth-btn" onclick="doRegister()">Criar conta</button>
+    <div class="auth-msg" id="registerMsg"></div>
   </div>
 </div>
 
-<!-- FOOTER -->
-<footer>
-  <div class="footer-logo">TÔAKI</div>
-  <div class="footer-links">
-    <a href="#">Privacidade</a>
-    <a href="#">Termos</a>
-    <a href="mailto:vicente.faria@sapo.pt">Contacto</a>
-  </div>
-  <div class="footer-copy">© 2026 TÔAKI</div>
-</footer>
+<!-- APP PRINCIPAL -->
+<div id="appScreen">
+  <header>
+    <div>
+      <div class="logo">TÔAKI <div class="logo-dot"></div></div>
+      <div class="header-sub">Diz onde estás</div>
+    </div>
+    <div class="header-right">
+      <button class="profile-btn" id="profileBtn" onclick="openProfileModal()">?</button>
+      <button class="logout-btn" onclick="doLogout()" title="Sair">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/>
+          <polyline points="16 17 21 12 16 7"/>
+          <line x1="21" y1="12" x2="9" y2="12"/>
+        </svg>
+      </button>
+    </div>
+  </header>
 
+  <!-- NAVEGAÇÃO -->
+  <div class="nav-tabs">
+    <button class="nav-tab active" id="navEnviar" onclick="switchNav('enviar')">
+      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="margin-right:4px;vertical-align:middle"><line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/></svg>
+      Enviar
+    </button>
+    <button class="nav-tab" id="navHistorico" onclick="switchNav('historico')">
+      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="margin-right:4px;vertical-align:middle"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+      Histórico
+    </button>
+    <button class="nav-tab" id="navProg" onclick="switchNav('prognostico')">
+      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="margin-right:4px;vertical-align:middle"><path d="M9 11l3 3L22 4"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/></svg>
+      Prognóstico
+    </button>
+  </div>
+
+  <div class="map-wrap">
+    <div id="mapContainer" class="loading-map">
+      <div class="spinner"></div>
+      <span>A obter localização...</span>
+    </div>
+    <div class="location-badge" id="locationBadge" style="display:none;">
+      <div class="pin"></div>
+      <div class="location-text" id="locationText">A localizar...</div>
+    </div>
+  </div>
+
+  <div class="section">
+    <div class="section-label">Local a enviar</div>
+    <div class="loc-selector" onclick="openPlacesModal()">
+      <div class="loc-sel-icon"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"/><circle cx="12" cy="10" r="3"/></svg></div>
+      <div style="flex:1">
+        <div class="loc-name" id="selectedLocName">Localizacao atual</div>
+        <div class="loc-sub" id="selectedLocSub">A tua posicao GPS</div>
+      </div>
+      <span class="loc-change">Mudar</span>
+    </div>
+  </div>
+
+  <div class="section">
+    <div class="section-label">Mensagem <span style="color:#555;font-size:9px;text-transform:none;letter-spacing:0">(opcional)</span></div>
+    <div class="msg-box">
+      <svg class="msg-icon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+        <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/>
+      </svg>
+      <textarea id="msgInput" rows="2" maxlength="120" placeholder="ex: Vem ter comigo, está ótimo aqui!" oninput="updateChar()"></textarea>
+    </div>
+    <div class="char-count"><span id="charCount">0</span>/120</div>
+  </div>
+
+  <div class="photo-area">
+    <div class="section-label" style="padding: 0 0 10px 0;">Foto <span style="color:#555;font-size:9px;text-transform:none;letter-spacing:0">(opcional)</span></div>
+    <button class="photo-btn" onclick="document.getElementById('photoInput').click()">
+      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+        <path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/>
+        <circle cx="12" cy="13" r="4"/>
+      </svg>
+      Tirar foto ou escolher da galeria
+    </button>
+    <input type="file" id="photoInput" accept="image/*" capture="environment" style="display:none" onchange="handlePhoto(event)">
+    <div class="photo-preview" id="photoPreview" style="display:none;">
+      <img id="photoImg" src="" alt="Foto">
+      <button class="photo-remove" onclick="removePhoto()">✕</button>
+    </div>
+  </div>
+
+  <div class="section">
+    <div class="section-label">Notificar contactos</div>
+    <div style="position:relative;margin-bottom:8px;">
+      <svg style="position:absolute;left:12px;top:50%;transform:translateY(-50%);opacity:0.4" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+      <input type="search" id="contactSearch" placeholder="Pesquisar contacto..." oninput="renderContacts()" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false"
+        style="width:100%;background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:10px 12px 10px 36px;color:var(--text);font-family:'DM Sans',sans-serif;font-size:14px;outline:none;" onkeydown="if(event.key==='Enter')event.preventDefault()">
+    </div>
+    <div class="contacts-list" id="contactsList"></div>
+    <div style="display:flex;gap:8px;margin-top:6px;">
+      <div class="add-contact" style="flex:1" onclick="openModal()">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/>
+          <line x1="19" y1="8" x2="19" y2="14"/><line x1="22" y1="11" x2="16" y2="11"/>
+        </svg>
+        Adicionar
+      </div>
+      <div class="add-contact" style="flex:1" onclick="pickFromContacts()" id="contactsPickerBtn">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/>
+          <path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/>
+        </svg>
+        Do telemóvel
+      </div>
+    </div>
+  </div>
+
+  <div class="send-wrap">
+    <button class="send-btn" id="sendBtn" onclick="sendLocation()" disabled>
+      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+        <line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/>
+      </svg>
+      Enviar localização
+      <span class="send-badge" id="sendBadge">0</span>
+    </button>
+  </div>
+</div>
+
+<!-- ECRÃ HISTÓRICO -->
+<div id="historyScreen">
+  <div class="history-tabs">
+    <button class="history-tab active" id="tabEnviados" onclick="switchHistoryTab('enviados')">Enviados</button>
+    <button class="history-tab" id="tabRecebidos" onclick="switchHistoryTab('recebidos')">Recebidos</button>
+  </div>
+  <div class="history-list" id="historyList">
+    <div class="history-empty">
+      <div class="history-empty-icon">📍</div>
+      <div>Ainda sem histórico</div>
+    </div>
+  </div>
+</div>
+<div id="progScreen">
+  <div class="prog-empty"><div class="spinner"></div></div>
+</div>
+
+<div class="modal-overlay" id="modalOverlay" onclick="closeModalOutside(event)">
+  <div class="modal">
+    <div class="modal-handle"></div>
+    <div class="modal-title">Novo contacto</div>
+    <div class="field"><label>Nome</label><input type="text" id="newName" placeholder="ex: Ana Silva"></div>
+    <div class="field"><label>Número WhatsApp (com indicativo)</label><input type="tel" id="newPhone" placeholder="ex: 351912345678"></div>
+    <button class="modal-btn" onclick="addContact()">Guardar contacto</button>
+  </div>
+</div>
+
+<!-- MODAL PERFIL -->
+<div class="modal-overlay" id="profileOverlay" onclick="closeProfileOutside(event)">
+  <div class="modal">
+    <div class="modal-handle"></div>
+    <div class="modal-title">O meu perfil</div>
+    <div class="field"><label>O meu nome</label><input type="text" id="profileName" placeholder="ex: Vicente"></div>
+    <div class="field"><label>O meu telemóvel (com indicativo)</label><input type="tel" id="profilePhone" placeholder="351912345678"></div>
+    <button class="modal-btn" onclick="saveProfile()">Guardar</button>
+    <div class="danger-zone">
+      <div class="danger-label">Zona de perigo</div>
+      <button class="danger-btn" onclick="confirmDeleteAccount()">Apagar a minha conta</button>
+    </div>
+  </div>
+</div>
+
+<!-- ECRÃ DE BOAS-VINDAS -->
+<div id="welcomeScreen" style="display:none;position:fixed;inset:0;background:var(--dark);z-index:500;flex-direction:column;align-items:center;justify-content:center;padding:32px 24px;text-align:center;">
+  <!-- PASSO 1: LOCALIZACAO -->
+  <div id="welcomeStepLocation" style="width:100%;max-width:340px;flex-direction:column;align-items:center;display:flex;">
+    <div style="font-size:56px;margin-bottom:24px">📍</div>
+    <div style="font-family:'Syne',sans-serif;font-size:26px;font-weight:800;margin-bottom:12px">Permitir localização</div>
+    <div style="font-size:14px;color:var(--muted);line-height:1.6;margin-bottom:40px;max-width:300px">
+      O TÔAKI precisa de aceder à tua localização para a poderes partilhar com quem quiseres. Só é enviada quando tu decides — nunca em segundo plano.
+    </div>
+    <button onclick="activateLocationFromWelcome()" style="width:100%;padding:18px;background:var(--red);border:none;border-radius:16px;color:#fff;font-family:'Syne',sans-serif;font-size:16px;font-weight:700;cursor:pointer;margin-bottom:12px">
+      📍 Permitir localização
+    </button>
+    <button onclick="nextWelcomeStep()" style="width:100%;padding:14px;background:transparent;border:1px solid var(--border);border-radius:16px;color:var(--muted);font-family:'Syne',sans-serif;font-size:14px;cursor:pointer">
+      Agora não
+    </button>
+  </div>
+  <!-- PASSO 2: NOTIFICACOES -->
+  <div id="welcomeStepNotif" style="width:100%;max-width:340px;flex-direction:column;align-items:center;display:none;">
+    <div style="font-size:56px;margin-bottom:24px">🔔</div>
+    <div style="font-family:'Syne',sans-serif;font-size:26px;font-weight:800;margin-bottom:12px">Ativar notificações</div>
+    <div style="font-size:14px;color:var(--muted);line-height:1.6;margin-bottom:40px;max-width:300px">
+      Ativa as notificações para receberes alertas instantâneos quando alguém partilhar a localização contigo — mesmo com o browser fechado.
+    </div>
+    <button onclick="activatePushFromWelcome()" style="width:100%;padding:18px;background:var(--red);border:none;border-radius:16px;color:#fff;font-family:'Syne',sans-serif;font-size:16px;font-weight:700;cursor:pointer;margin-bottom:12px">
+      🔔 Ativar notificações
+    </button>
+    <button onclick="skipWelcome()" style="width:100%;padding:14px;background:transparent;border:1px solid var(--border);border-radius:16px;color:var(--muted);font-family:'Syne',sans-serif;font-size:14px;cursor:pointer">
+      Agora não
+    </button>
+  </div>
+</div>
+
+<!-- MODAL APAGAR CONTA -->
+<div class="modal-overlay" id="deleteConfirmOverlay" onclick="closeDeleteConfirm(event)">
+  <div class="modal">
+    <div class="modal-handle"></div>
+    <div class="modal-title">Apagar a tua conta?</div>
+    <div class="delete-warn">Esta ação é <strong>permanente</strong> e não pode ser desfeita. Vamos apagar:</div>
+    <ul class="delete-list">
+      <li>A tua conta e dados de perfil</li>
+      <li>As localizações enviadas e recebidas</li>
+      <li>As mensagens trocadas</li>
+      <li>As fotos que partilhaste</li>
+      <li>As notificações push</li>
+    </ul>
+    <button class="modal-btn-danger" id="deleteConfirmBtn" onclick="deleteAccount()">Apagar definitivamente</button>
+    <button class="modal-btn-cancel" onclick="closeDeleteConfirm()">Cancelar</button>
+  </div>
+</div>
+
+<!-- MODAL ESCOLHER LOCAL -->
+<div class="modal-overlay" id="placesOverlay" onclick="closePlacesModal(event)">
+  <div class="modal">
+    <div class="modal-handle"></div>
+    <div class="modal-title">Local a enviar</div>
+    <div id="placesList"></div>
+    <button class="modal-btn" onclick="openAddPlace()" style="margin-top:6px">+ Adicionar local</button>
+  </div>
+</div>
+
+<!-- MODAL ADICIONAR LOCAL -->
+<div class="modal-overlay" id="addPlaceOverlay" onclick="closeAddPlace(event)">
+  <div class="modal">
+    <div class="modal-handle"></div>
+    <div class="modal-title">Adicionar local</div>
+    <input class="place-input" id="placeName" placeholder="Nome (ex: Convivio Quinta do Lorde)" maxlength="40">
+    <div style="display:flex;gap:8px;align-items:flex-start">
+      <input class="place-input" id="placeSearch" placeholder="Procurar morada ou sitio..." style="margin-bottom:0" onkeydown="if(event.key==='Enter'){event.preventDefault();searchPlace();}">
+      <button class="modal-btn" style="width:auto;margin-top:0;padding:12px 16px;white-space:nowrap" onclick="searchPlace()">Procurar</button>
+    </div>
+    <div id="placeResults" style="max-height:200px;overflow-y:auto;margin:10px 0"></div>
+    <div style="font-size:11px;color:var(--muted);margin:4px 0 8px;text-transform:uppercase;letter-spacing:0.08em">Ou toca no mapa para marcar</div>
+    <div id="placeMap" style="height:220px;border-radius:12px;overflow:hidden;border:1px solid var(--border);margin-bottom:10px"></div>
+    <div id="placePicked" style="display:none;font-size:13px;color:#2ECC71;margin-bottom:10px"></div>
+    <button class="modal-btn" id="savePlaceBtn" onclick="saveNewPlace()" disabled style="opacity:0.5">Guardar local</button>
+    <button class="modal-btn-cancel" onclick="closeAddPlace()">Cancelar</button>
+  </div>
+</div>
+
+<div class="lp-ov" id="listaProntaOverlay">
+  <div class="lp-head">
+    <button class="lp-close" onclick="fecharListaPronta()">&#10005;</button>
+    <div class="lp-title" id="lpTitulo">Lista pronta</div>
+  </div>
+  <div class="lp-body">
+    <div class="prog-sub" id="lpSub" style="margin-bottom:14px"></div>
+    <div id="lpBody"></div>
+    <button class="lp-copy" onclick="copiarListaPronta()">Copiar lista (texto)</button>
+  </div>
+</div>
+
+<div class="modal-overlay" id="progAdminModal" onclick="if(event.target===this)this.classList.remove('open')">
+  <div class="modal">
+    <div class="modal-handle"></div>
+    <div class="modal-title" id="progAdminTitulo">Registar</div>
+    <div class="prog-sub" id="progAdminSub" style="margin-bottom:12px"></div>
+    <div class="section-label" style="margin:4px 0 6px">Prognosticos da lista</div>
+    <div id="progAdminProgs" style="max-height:200px;overflow-y:auto;margin-bottom:12px"></div>
+    <input class="place-input" id="progAdminValor" inputmode="decimal" placeholder="Valor">
+    <input type="file" id="progAdminFile" accept="image/*" style="display:none" onchange="progAdminFoto(event)">
+    <button class="modal-btn" style="background:var(--mid);border:1px solid var(--border)" onclick="document.getElementById('progAdminFile').click()">Escolher foto</button>
+    <div id="progAdminFotoPrev" style="display:none;margin-top:10px"><img id="progAdminImg" style="width:100%;border-radius:12px"></div>
+    <button class="modal-btn" id="progAdminBtn" onclick="progAdminConfirmar()" disabled style="opacity:0.5;margin-top:10px">Confirmar</button>
+    <button class="modal-btn-cancel" onclick="document.getElementById('progAdminModal').classList.remove('open')">Cancelar</button>
+  </div>
+</div>
+
+<div class="prog-ov" id="prognosticosOverlay">
+  <div class="prog-ov-head">
+    <button class="prog-ov-close" onclick="progFecharPrognosticos()">&#10005;</button>
+    <div class="prog-ov-title" id="progListaTitulo">Lista</div>
+  </div>
+  <div class="prog-ov-body">
+    <div class="section-label" style="margin-bottom:6px">Data da lista</div>
+    <input class="place-input" type="date" id="progDataInput" onchange="progCarregarDia()">
+    <div class="prog-fecho" id="progFechoInfo"></div>
+    <div id="progListaBody"></div>
+  </div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+  const BASE_URL = 'https://toaki.pt/';
+  const SUPABASE_URL = 'https://lwangbwlcfilfmtyotns.supabase.co';
+  const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imx3YW5nYndsY2ZpbGZtdHlvdG5zIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Nzk4OTc0MzAsImV4cCI6MjA5NTQ3MzQzMH0.tXRnN-UC8Skur6iQyt8rIsa4zQYGoiYj9EMDoJ6ox0c';
+
+  let currentUser = null;
+  let userName = '';
+  let contacts = [];
+  let selectedIds = new Set();
+  let userLat = null, userLon = null;
+  let photoData = null;
+  let photoUrl = null;
+  let savedPlaces = [];
+  let selectedPlace = null;
+  const avatarColors = ['av-1','av-2','av-3','av-4','av-5'];
+
+  // ── AUTH HELPERS ──────────────────────────────────────────
+  // Normaliza telefones para formato canonico (com indicativo). App PT -> default 351.
+  function normalizePhone(raw) {
+    let p = (raw || '').replace(/\D/g, '');
+    if (!p) return '';
+    if (p.startsWith('00')) p = p.slice(2);   // 00351... -> 351...
+    if (p.length === 9) return '351' + p;      // numero PT local (9 digitos) -> +indicativo
+    return p;                                  // ja tem indicativo (351... ou outro)
+  }
+
+  async function sbFetch(path, options = {}) {
+    const res = await fetch(`${SUPABASE_URL}${path}`, {
+      ...options,
+      headers: {
+        'Content-Type': 'application/json',
+        'apikey': SUPABASE_KEY,
+        ...(options.headers || {})
+      }
+    });
+    return res;
+  }
+
+  function saveSession(session) {
+    if (session) localStorage.setItem('toaki_session', JSON.stringify(session));
+    else localStorage.removeItem('toaki_session');
+  }
+
+  let recoveryToken = null;
+  function loadSession() {
+    try { return JSON.parse(localStorage.getItem('toaki_session')); }
+    catch { return null; }
+  }
+
+  async function refreshToken(refreshTk) {
+    const res = await sbFetch('/auth/v1/token?grant_type=refresh_token', {
+      method: 'POST',
+      body: JSON.stringify({ refresh_token: refreshTk })
+    });
+    if (res.ok) {
+      const data = await res.json();
+      saveSession(data);
+      return data;
+    }
+    return null;
+  }
+
+  // ── INIT ──────────────────────────────────────────────────
+  function detectarRecuperacao() {
+    try {
+      const h = (location.hash || '').replace(/^#/, '');
+      if (!h) return false;
+      const p = new URLSearchParams(h);
+      if (p.get('type') === 'recovery' && p.get('access_token')) {
+        recoveryToken = p.get('access_token');
+        // limpar o hash do URL
+        history.replaceState(null, '', location.pathname + location.search);
+        showAuth();
+        document.getElementById('loginForm').style.display = 'none';
+        document.getElementById('registerForm').style.display = 'none';
+        document.getElementById('recoverForm').style.display = 'none';
+        document.getElementById('newPassForm').style.display = 'block';
+        document.getElementById('tabLogin').classList.remove('active');
+        document.getElementById('tabRegister').classList.remove('active');
+        return true;
+      }
+    } catch (e) {}
+    return false;
+  }
+
+  async function init() {
+    if (detectarRecuperacao()) return;   // veio de um link de recuperacao
+    const session = loadSession();
+    if (session?.access_token) {
+      // Tenta refrescar para garantir token válido
+      const fresh = await refreshToken(session.refresh_token);
+      if (fresh?.user) {
+        startApp(fresh);
+        return;
+      }
+    }
+    showAuth();
+  }
+
+  function showAuth() {
+    document.getElementById('authScreen').style.display = 'flex';
+    document.getElementById('appScreen').style.display = 'none';
+    document.getElementById('welcomeScreen').style.display = 'none';
+  }
+
+  function startApp(session) {
+    currentUser = session.user;
+    userName = currentUser.user_metadata?.name ||
+               localStorage.getItem('toaki_name') ||
+               currentUser.email.split('@')[0];
+    saveSession(session);
+    const myPhone = normalizePhone(currentUser.user_metadata?.phone || localStorage.getItem('toaki_phone') || '');
+    if (myPhone) localStorage.setItem('toaki_phone', myPhone);
+
+    document.getElementById('authScreen').style.display = 'none';
+    document.getElementById('appScreen').style.display = 'flex';
+
+    // Mostrar ecrã de boas-vindas se vem do registo
+    const fromRegister = window._showWelcome;
+    if (fromRegister) {
+      window._showWelcome = false;
+      showWelcome('location');
+    }
+
+    updateProfileBtn();
+    loadContacts();
+    loadPlaces();
+    selectedPlace = null;
+    updateSelectedLocLabel();
+    if (!fromRegister) initLocation();
+
+    // Link partilhado: ?lista=ID abre direto no separador Prognostico
+    try {
+      if (new URLSearchParams(location.search).get('lista')) setTimeout(() => switchNav('prognostico'), 300);
+    } catch (e) {}
+
+    // Verificar se notificações já foram ativadas neste browser
+    const userPhone = session.user?.user_metadata?.phone || localStorage.getItem('toaki_phone') || '';
+    if (userPhone && !window._showWelcome) {
+      setTimeout(async () => {
+        try {
+          if (!('serviceWorker' in navigator) || !('PushManager' in window)) return;
+          const reg = await navigator.serviceWorker.getRegistration('./sw.js');
+          const sub = reg ? await reg.pushManager.getSubscription() : null;
+          if (!sub) {
+            // Sem subscrição ativa — mostrar ecrã
+            localStorage.setItem('toaki_pending_push_phone', userPhone);
+            showWelcome('notif');
+          }
+        } catch(e) { console.log('Push check:', e.message); }
+      }, 1500);
+    }
+  }
+
+  function showWelcome(step) {
+    document.getElementById('welcomeStepLocation').style.display = step === 'location' ? 'flex' : 'none';
+    document.getElementById('welcomeStepNotif').style.display = step === 'notif' ? 'flex' : 'none';
+    document.getElementById('welcomeScreen').style.display = 'flex';
+  }
+  function nextWelcomeStep() {
+    document.getElementById('welcomeStepLocation').style.display = 'none';
+    document.getElementById('welcomeStepNotif').style.display = 'flex';
+  }
+  function activateLocationFromWelcome() {
+    if (!navigator.geolocation) { nextWelcomeStep(); return; }
+    navigator.geolocation.getCurrentPosition(
+      pos => {
+        userLat = pos.coords.latitude;
+        userLon = pos.coords.longitude;
+        initLocation();
+        showToast('✓ Localização ativada!', 'success');
+        nextWelcomeStep();
+      },
+      () => { showToast('Permissão de localização recusada.', 'error'); nextWelcomeStep(); },
+      { enableHighAccuracy: true, timeout: 10000 }
+    );
+  }
+
+  async function activatePushFromWelcome() {
+    const phone = localStorage.getItem('toaki_pending_push_phone') || currentUser?.user_metadata?.phone || localStorage.getItem('toaki_phone');
+    if (!phone) { skipWelcome(); return; }
+    try {
+      const reg = await navigator.serviceWorker.register('./sw.js');
+      await navigator.serviceWorker.ready;
+      const perm = await Notification.requestPermission();
+      if (perm !== 'granted') { skipWelcome(); return; }
+      const VAPID_KEY = 'BPAlPFXzeq7el-o42c5fwQ332fRHyxAVreur_SLUK6B25wdFPmWXEV1CmFqvey_InZuwbRElaVfO5bs5ovfp7R0';
+      const pad = s => '='.repeat((4 - s.length % 4) % 4);
+      const vapidBytes = Uint8Array.from(atob((VAPID_KEY + pad(VAPID_KEY)).replace(/-/g,'+').replace(/_/g,'/')), c => c.charCodeAt(0));
+      const sub = await reg.pushManager.subscribe({ userVisibleOnly: true, applicationServerKey: vapidBytes });
+      await fetch(`${SUPABASE_URL}/rest/v1/push_subscriptions`, {
+        method: 'POST',
+        headers: { 'apikey': SUPABASE_KEY, 'Authorization': `Bearer ${SUPABASE_KEY}`, 'Content-Type': 'application/json', 'Prefer': 'return=minimal' },
+        body: JSON.stringify({ phone, subscription: sub.toJSON() })
+      });
+      localStorage.setItem('toaki_push_phone', phone);
+      localStorage.removeItem('toaki_pending_push_phone');
+      showToast('✓ Notificações ativas!', 'success');
+    } catch(e) { console.log('Push error:', e.message); }
+    skipWelcome();
+  }
+
+  function skipWelcome() {
+    document.getElementById('welcomeScreen').style.display = 'none';
+    localStorage.removeItem('toaki_pending_push_phone');
+  }
+
+  // ── AUTH ACTIONS ──────────────────────────────────────────
+  function mostrarRecuperar() {
+    document.getElementById('loginForm').style.display = 'none';
+    document.getElementById('registerForm').style.display = 'none';
+    document.getElementById('newPassForm').style.display = 'none';
+    document.getElementById('recoverForm').style.display = 'block';
+    document.getElementById('tabLogin').classList.remove('active');
+    document.getElementById('tabRegister').classList.remove('active');
+    const rc = document.getElementById('recoverEmail');
+    const le = document.getElementById('loginEmail');
+    if (le && le.value) rc.value = le.value;
+  }
+
+  async function pedirRecuperacao() {
+    const email = document.getElementById('recoverEmail').value.trim();
+    const msg = document.getElementById('recoverMsg');
+    if (!email) { setMsg(msg, 'Escreve o teu email.', 'error'); return; }
+    setMsg(msg, 'A enviar...', '');
+    try {
+      const res = await sbFetch('/auth/v1/recover', {
+        method: 'POST',
+        body: JSON.stringify({ email: email, redirect_to: BASE_URL + 'toaki.html' })
+      });
+      if (res.ok) {
+        setMsg(msg, 'Enviamos um link para o teu email. Verifica a caixa de entrada (e o spam).', 'success');
+      } else {
+        const d = await res.json().catch(() => ({}));
+        setMsg(msg, d.msg || d.error_description || 'Nao foi possivel enviar. Tenta mais tarde.', 'error');
+      }
+    } catch (e) { setMsg(msg, 'Erro de ligacao.', 'error'); }
+  }
+
+  async function definirNovaPassword() {
+    const p1 = document.getElementById('newPass1').value;
+    const p2 = document.getElementById('newPass2').value;
+    const msg = document.getElementById('newPassMsg');
+    if (p1.length < 6) { setMsg(msg, 'Minimo 6 caracteres.', 'error'); return; }
+    if (p1 !== p2) { setMsg(msg, 'As passwords nao coincidem.', 'error'); return; }
+    if (!recoveryToken) { setMsg(msg, 'Sessao de recuperacao invalida. Pede um novo link.', 'error'); return; }
+    setMsg(msg, 'A guardar...', '');
+    try {
+      const res = await fetch(SUPABASE_URL + '/auth/v1/user', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json', 'apikey': SUPABASE_KEY, 'Authorization': 'Bearer ' + recoveryToken },
+        body: JSON.stringify({ password: p1 })
+      });
+      const d = await res.json().catch(() => ({}));
+      if (res.ok) {
+        recoveryToken = null;
+        setMsg(msg, 'Password alterada! Ja podes entrar.', 'success');
+        setTimeout(() => { switchTab('login'); }, 1500);
+      } else {
+        setMsg(msg, d.msg || d.error_description || 'Erro ao guardar a password.', 'error');
+      }
+    } catch (e) { setMsg(msg, 'Erro de ligacao.', 'error'); }
+  }
+
+  function switchTab(tab) {
+    document.getElementById('loginForm').style.display = tab === 'login' ? 'block' : 'none';
+    document.getElementById('registerForm').style.display = tab === 'register' ? 'block' : 'none';
+    document.getElementById('recoverForm').style.display = 'none';
+    document.getElementById('newPassForm').style.display = 'none';
+    document.getElementById('tabLogin').className = 'auth-tab' + (tab === 'login' ? ' active' : '');
+    document.getElementById('tabRegister').className = 'auth-tab' + (tab === 'register' ? ' active' : '');
+    document.getElementById('loginMsg').textContent = '';
+    document.getElementById('registerMsg').textContent = '';
+  }
+
+  async function doLogin() {
+    const email = document.getElementById('loginEmail').value.trim();
+    const password = document.getElementById('loginPassword').value;
+    const msg = document.getElementById('loginMsg');
+    if (!email || !password) { setMsg(msg, 'Preenche email e password.', 'error'); return; }
+
+    setMsg(msg, 'A entrar...', '');
+    const res = await sbFetch('/auth/v1/token?grant_type=password', {
+      method: 'POST',
+      body: JSON.stringify({ email, password })
+    });
+    const data = await res.json();
+    if (res.ok && data.access_token) {
+      startApp(data);
+    } else {
+      setMsg(msg, data.error_description || data.msg || 'Erro ao entrar. Verifica os dados.', 'error');
+    }
+  }
+
+  async function doRegister() {
+    const name = document.getElementById('regName').value.trim();
+    const phone = normalizePhone(document.getElementById('regPhone').value);
+    const email = document.getElementById('regEmail').value.trim();
+    const password = document.getElementById('regPassword').value;
+    const msg = document.getElementById('registerMsg');
+    if (!name || !email || !password) { setMsg(msg, 'Preenche todos os campos.', 'error'); return; }
+    if (password.length < 6) { setMsg(msg, 'Password com mínimo 6 caracteres.', 'error'); return; }
+    if (!document.getElementById('regTerms').checked) { setMsg(msg, 'Deves aceitar os Termos e a Política de Privacidade.', 'error'); return; }
+
+    setMsg(msg, 'A criar conta...', '');
+    const res = await sbFetch('/auth/v1/signup', {
+      method: 'POST',
+      body: JSON.stringify({ email, password, data: { name, phone } })
+    });
+    const data = await res.json();
+    if (res.ok && data.access_token) {
+      // Guardar perfil na tabela profiles
+      if (data.user?.id) {
+        await fetch(`${SUPABASE_URL}/rest/v1/profiles`, {
+          method: 'POST',
+          headers: {
+            'apikey': SUPABASE_KEY,
+            'Authorization': `Bearer ${data.access_token}`,
+            'Content-Type': 'application/json',
+            'Prefer': 'return=minimal'
+          },
+          body: JSON.stringify({ id: data.user.id, name, phone })
+        });
+      }
+      // Guardar telefone localmente
+      if (phone) localStorage.setItem('toaki_phone', phone);
+      // Pedir notificações logo após registo
+      setMsg(msg, '✓ Conta criada! A ativar notificações...', 'success');
+      await subscribeAfterRegister(phone);
+      startApp(data);
+    } else if (res.ok && data.id) {
+      setMsg(msg, '✓ Conta criada! Confirma o teu email para entrar.', 'success');
+    } else {
+      setMsg(msg, data.error_description || data.msg || 'Erro ao registar.', 'error');
+    }
+  }
+
+  async function subscribeAfterRegister(phone) {
+    // Mostrar ecrã de boas-vindas com botão para ativar notificações
+    // O browser exige que requestPermission seja chamado dentro de um clique
+    if (phone) {
+      localStorage.setItem('toaki_pending_push_phone', phone);
+    }
+    // Flag para mostrar o ecrã de boas-vindas após startApp
+    window._showWelcome = true;
+  }
+
+  async function doLogout() {
+    const session = loadSession();
+    if (session?.access_token) {
+      await sbFetch('/auth/v1/logout', {
+        method: 'POST',
+        headers: { 'Authorization': `Bearer ${session.access_token}` }
+      });
+    }
+    saveSession(null);
+    currentUser = null;
+    userName = '';
+    showAuth();
+    showToast('Sessão terminada', '');
+  }
+
+  function setMsg(el, text, type) {
+    el.textContent = text;
+    el.className = 'auth-msg' + (type ? ' ' + type : '');
+  }
+
+  // ── PERFIL ────────────────────────────────────────────────
+  function updateProfileBtn() {
+    document.getElementById('profileBtn').textContent = userName ? userName[0].toUpperCase() : '?';
+  }
+
+  function openProfileModal() {
+    document.getElementById('profileName').value = userName;
+    document.getElementById('profilePhone').value = currentUser?.user_metadata?.phone || localStorage.getItem('toaki_phone') || '';
+    document.getElementById('profileOverlay').classList.add('open');
+    setTimeout(() => document.getElementById('profileName').focus(), 300);
+  }
+  function closeProfileOutside(e) {
+    if (e.target === document.getElementById('profileOverlay')) document.getElementById('profileOverlay').classList.remove('open');
+  }
+  function saveProfile() {
+    const name = document.getElementById('profileName').value.trim();
+    const phone = normalizePhone(document.getElementById('profilePhone').value);
+    if (!name) { showToast('Escreve o teu nome!', 'error'); return; }
+    userName = name;
+    localStorage.setItem('toaki_name', name);
+    if (phone) localStorage.setItem('toaki_phone', phone);
+    updateProfileBtn();
+    document.getElementById('profileOverlay').classList.remove('open');
+    showToast(`✓ Perfil guardado!`, 'success');
+  }
+
+  // ── CONTACTOS ─────────────────────────────────────────────
+  // ===== APAGAR CONTA =====
+  function confirmDeleteAccount() {
+    document.getElementById('profileOverlay').classList.remove('open');
+    document.getElementById('deleteConfirmOverlay').classList.add('open');
+  }
+  function closeDeleteConfirm(e) {
+    if (!e || e.target === document.getElementById('deleteConfirmOverlay')) {
+      document.getElementById('deleteConfirmOverlay').classList.remove('open');
+    }
+  }
+  async function deleteAccount() {
+    const session = loadSession();
+    if (!session?.access_token) { showToast('Sessao invalida. Volta a entrar.', 'error'); return; }
+    const btn = document.getElementById('deleteConfirmBtn');
+    btn.disabled = true;
+    btn.textContent = 'A apagar...';
+    try {
+      const res = await fetch(`${SUPABASE_URL}/functions/v1/delete-account`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'apikey': SUPABASE_KEY,
+          'Authorization': `Bearer ${session.access_token}`
+        }
+      });
+      const data = await res.json().catch(() => ({}));
+      if (res.ok && data.success) {
+        // Cancelar subscricao push do browser
+        try {
+          const reg = await navigator.serviceWorker.getRegistration('./sw.js');
+          const sub = reg && await reg.pushManager.getSubscription();
+          if (sub) await sub.unsubscribe();
+        } catch (e) {}
+        // Limpar tudo localmente
+        const uid = currentUser?.id;
+        ['toaki_session','toaki_name','toaki_phone','toaki_push_phone','toaki_pending_push_phone'].forEach(k => localStorage.removeItem(k));
+        if (uid) localStorage.removeItem(`toaki_contacts_${uid}`);
+        currentUser = null;
+        userName = '';
+        contacts = [];
+        document.getElementById('deleteConfirmOverlay').classList.remove('open');
+        document.getElementById('profileOverlay').classList.remove('open');
+        showAuth();
+        showToast('Conta apagada.', 'success');
+      } else {
+        btn.disabled = false;
+        btn.textContent = 'Apagar definitivamente';
+        showToast(data.error || 'Erro ao apagar a conta. Tenta novamente.', 'error');
+      }
+    } catch (e) {
+      btn.disabled = false;
+      btn.textContent = 'Apagar definitivamente';
+      showToast('Erro de ligacao. Tenta novamente.', 'error');
+    }
+  }
+
+  // ===== LOCAIS GUARDADOS =====
+  let pickedPlace = null;
+  function placesKey() { return 'toaki_places_' + (currentUser?.id || 'anon'); }
+  function loadPlaces() {
+    try { savedPlaces = JSON.parse(localStorage.getItem(placesKey()) || '[]'); } catch (e) { savedPlaces = []; }
+    if (!Array.isArray(savedPlaces)) savedPlaces = [];
+  }
+  function savePlaces() { localStorage.setItem(placesKey(), JSON.stringify(savedPlaces)); }
+  function updateSelectedLocLabel() {
+    const nameEl = document.getElementById('selectedLocName');
+    const subEl = document.getElementById('selectedLocSub');
+    if (!nameEl) return;
+    if (selectedPlace) { nameEl.textContent = selectedPlace.name; subEl.textContent = 'Local guardado'; }
+    else { nameEl.textContent = 'Localizacao atual'; subEl.textContent = 'A tua posicao GPS'; }
+  }
+  function openPlacesModal() { renderPlacesList(); document.getElementById('placesOverlay').classList.add('open'); }
+  function closePlacesModal(e) {
+    if (!e || e.target === document.getElementById('placesOverlay')) document.getElementById('placesOverlay').classList.remove('open');
+  }
+  function renderPlacesList() {
+    let html = '<div class="place-item' + (selectedPlace ? '' : ' sel') + '" onclick="selectPlace(null)">' +
+      '<div class="loc-sel-icon"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M12 2v3M12 19v3M2 12h3M19 12h3"/></svg></div>' +
+      '<div class="place-item-name">Localizacao atual</div>' +
+    '</div>';
+    savedPlaces.forEach(p => {
+      html += '<div class="place-item' + (selectedPlace && selectedPlace.id === p.id ? ' sel' : '') + '">' +
+        '<div class="loc-sel-icon" onclick="selectPlace(\'' + p.id + '\')"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"/><circle cx="12" cy="10" r="3"/></svg></div>' +
+        '<div class="place-item-name" onclick="selectPlace(\'' + p.id + '\')">' + p.name + '</div>' +
+        '<div class="place-del" onclick="deletePlace(\'' + p.id + '\')">\u00D7</div>' +
+      '</div>';
+    });
+    document.getElementById('placesList').innerHTML = html;
+  }
+  function selectPlace(id) {
+    if (id === null) {
+      selectedPlace = null;
+      if (userLat != null) { showMap(userLat, userLon); document.getElementById('locationText').textContent = userLat.toFixed(5) + ', ' + userLon.toFixed(5); }
+    } else {
+      const p = savedPlaces.find(x => x.id === id);
+      if (!p) return;
+      selectedPlace = p;
+      showMap(p.lat, p.lon);
+      document.getElementById('locationBadge').style.display = 'flex';
+      document.getElementById('locationText').textContent = p.name;
+    }
+    updateSelectedLocLabel();
+    updateSendBtn();
+    closePlacesModal();
+  }
+  function deletePlace(id) {
+    savedPlaces = savedPlaces.filter(x => x.id !== id);
+    savePlaces();
+    if (selectedPlace && selectedPlace.id === id) selectPlace(null);
+    renderPlacesList();
+  }
+  let placeMap = null, placeMarker = null;
+  function initPlaceMap() {
+    if (typeof L === 'undefined') return;
+    const def = (userLat != null) ? [userLat, userLon] : [32.6669, -16.9241];
+    const z = userLat != null ? 15 : 12;
+    if (!placeMap) {
+      placeMap = L.map('placeMap').setView(def, z);
+      L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', { maxZoom: 19, attribution: '\u00A9 OpenStreetMap' }).addTo(placeMap);
+      placeMap.on('click', e => setPlaceMarker(e.latlng.lat, e.latlng.lng, false));
+    } else {
+      placeMap.setView(def, z);
+    }
+    if (placeMarker) { placeMap.removeLayer(placeMarker); placeMarker = null; }
+    setTimeout(() => placeMap.invalidateSize(), 120);
+  }
+  function setPlaceMarker(lat, lon, recenter) {
+    pickedPlace = { lat: lat, lon: lon };
+    const picked = document.getElementById('placePicked');
+    picked.style.display = 'block'; picked.textContent = '\u2713 Local selecionado';
+    const btn = document.getElementById('savePlaceBtn'); btn.disabled = false; btn.style.opacity = '1';
+    if (placeMap) {
+      if (placeMarker) { placeMarker.setLatLng([lat, lon]); }
+      else {
+        placeMarker = L.marker([lat, lon], { draggable: true }).addTo(placeMap);
+        placeMarker.on('dragend', () => { const p = placeMarker.getLatLng(); setPlaceMarker(p.lat, p.lng, false); });
+      }
+      if (recenter) placeMap.setView([lat, lon], 16);
+    }
+  }
+  function openAddPlace() {
+    pickedPlace = null;
+    document.getElementById('placeName').value = '';
+    document.getElementById('placeSearch').value = '';
+    document.getElementById('placeResults').innerHTML = '';
+    document.getElementById('placePicked').style.display = 'none';
+    const btn = document.getElementById('savePlaceBtn'); btn.disabled = true; btn.style.opacity = '0.5';
+    document.getElementById('placesOverlay').classList.remove('open');
+    document.getElementById('addPlaceOverlay').classList.add('open');
+    setTimeout(() => initPlaceMap(), 250);
+  }
+  function closeAddPlace(e) {
+    if (!e || e.target === document.getElementById('addPlaceOverlay')) document.getElementById('addPlaceOverlay').classList.remove('open');
+  }
+  async function searchPlace() {
+    const q = document.getElementById('placeSearch').value.trim();
+    if (!q) return;
+    const box = document.getElementById('placeResults');
+    box.innerHTML = '<div style="padding:12px;color:var(--muted);font-size:13px">A procurar...</div>';
+    try {
+      const res = await fetch('https://nominatim.openstreetmap.org/search?format=json&limit=6&accept-language=pt&q=' + encodeURIComponent(q));
+      const data = await res.json();
+      if (!Array.isArray(data) || !data.length) { box.innerHTML = '<div style="padding:12px;color:var(--muted);font-size:13px">Sem resultados.</div>'; return; }
+      box.innerHTML = data.map(r => '<div class="place-result" onclick="pickSearchResult(' + r.lat + ',' + r.lon + ', this)">' + r.display_name + '</div>').join('');
+    } catch (e) {
+      box.innerHTML = '<div style="padding:12px;color:var(--red);font-size:13px">Erro na pesquisa.</div>';
+    }
+  }
+  function pickSearchResult(lat, lon, el) {
+    document.querySelectorAll('#placeResults .place-result').forEach(x => x.style.background = '');
+    if (el) el.style.background = 'rgba(46,204,113,0.12)';
+    setPlaceMarker(parseFloat(lat), parseFloat(lon), true);
+  }
+  function saveNewPlace() {
+    const name = document.getElementById('placeName').value.trim();
+    if (!name) { showToast('Da um nome ao local.', 'error'); return; }
+    if (!pickedPlace) { showToast('Procura e escolhe o sitio.', 'error'); return; }
+    savedPlaces.push({ id: 'p' + Date.now(), name: name, lat: pickedPlace.lat, lon: pickedPlace.lon });
+    savePlaces();
+    closeAddPlace();
+    openPlacesModal();
+    showToast('\u2713 Local guardado!', 'success');
+  }
+
+  function loadContacts() {
+    const key = `toaki_contacts_${currentUser?.id || 'guest'}`;
+    contacts = JSON.parse(localStorage.getItem(key) || '[]');
+    saveContacts();
+    renderContacts();
+  }
+
+  function saveContacts() {
+    const key = `toaki_contacts_${currentUser?.id || 'guest'}`;
+    localStorage.setItem(key, JSON.stringify(contacts));
+  }
+
+  function getInitials(name) { return name.split(' ').map(w => w[0]).join('').substring(0, 2).toUpperCase(); }
+
+  function renderContacts() {
+    const list = document.getElementById('contactsList');
+    const search = (document.getElementById('contactSearch')?.value || '').toLowerCase().trim();
+    const filtered = search ? contacts.filter(c => c.name.toLowerCase().includes(search) || c.phone.includes(search)) : contacts;
+    list.innerHTML = '';
+    filtered.forEach((c, i) => {
+      const selected = selectedIds.has(c.id);
+      const div = document.createElement('div');
+      div.className = 'contact-item' + (selected ? ' selected' : '');
+      div.onclick = () => toggleContact(c.id);
+      div.innerHTML = `
+        <div class="avatar ${avatarColors[i % 5]}">${getInitials(c.name)}</div>
+        <div class="contact-info">
+          <div class="contact-name">${c.name}</div>
+          <div class="contact-phone">+${c.phone}</div>
+        </div>
+        <div class="check-circle">
+          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="3">
+            <polyline points="20 6 9 17 4 12"/>
+          </svg>
+        </div>`;
+      list.appendChild(div);
+    });
+    updateSendBtn();
+  }
+
+  function toggleContact(id) {
+    if (selectedIds.has(id)) selectedIds.delete(id);
+    else selectedIds.add(id);
+    renderContacts();
+  }
+
+  function updateSendBtn() {
+    const n = selectedIds.size;
+    document.getElementById('sendBadge').textContent = n;
+    document.getElementById('sendBtn').disabled = n === 0 || (userLat == null && !selectedPlace);
+  }
+
+  async function pickFromContacts() {
+    if (!('contacts' in navigator) || !('ContactsManager' in window)) {
+      // Safari ou browser sem suporte — abre modal manual diretamente
+      openModal();
+      return;
+    }
+    try {
+      const props = ['name', 'tel'];
+      const opts = { multiple: true };
+      const selected = await navigator.contacts.select(props, opts);
+      if (!selected || !selected.length) return;
+
+      let adicionados = 0;
+      for (const contact of selected) {
+        const name = contact.name?.[0] || 'Sem nome';
+        const tel = normalizePhone(contact.tel?.[0]);
+        if (!tel) continue;
+
+        // Verificar se já existe
+        const existe = contacts.find(c => normalizePhone(c.phone) === tel);
+        if (existe) {
+          // Selecionar automaticamente
+          selectedIds.add(existe.id);
+          continue;
+        }
+
+        // Adicionar novo contacto
+        const newContact = { id: Date.now() + adicionados, name, phone: tel };
+        contacts.push(newContact);
+        selectedIds.add(newContact.id);
+        adicionados++;
+      }
+
+      saveContacts();
+      renderContacts();
+      if (adicionados > 0) showToast(`✓ ${adicionados} contacto${adicionados > 1 ? 's' : ''} adicionado${adicionados > 1 ? 's' : ''}!`, 'success');
+      else showToast('Contactos já existem — selecionados!', 'success');
+    } catch(e) {
+      console.error('Contacts error:', e);
+      showToast('Erro ao aceder à lista de contactos.', 'error');
+    }
+  }
+
+  function openModal() {
+    document.getElementById('modalOverlay').classList.add('open');
+    setTimeout(() => document.getElementById('newName').focus(), 300);
+  }
+  function closeModal() {
+    document.getElementById('modalOverlay').classList.remove('open');
+    document.getElementById('newName').value = '';
+    document.getElementById('newPhone').value = '';
+  }
+  function closeModalOutside(e) {
+    if (e.target === document.getElementById('modalOverlay')) closeModal();
+  }
+  function addContact() {
+    const name = document.getElementById('newName').value.trim();
+    const phone = normalizePhone(document.getElementById('newPhone').value);
+    if (!name || !phone) { showToast('Preenche o nome e o número!', 'error'); return; }
+    contacts.push({ id: Date.now(), name, phone });
+    saveContacts();
+    renderContacts();
+    closeModal();
+    showToast(`✓ ${name} adicionado!`, 'success');
+  }
+
+  // ── FOTO ──────────────────────────────────────────────────
+  async function uploadFoto(base64) {
+    try {
+      const base64Data = base64.split(',')[1];
+      const byteChars = atob(base64Data);
+      const byteArr = new Uint8Array(byteChars.length);
+      for (let i = 0; i < byteChars.length; i++) byteArr[i] = byteChars.charCodeAt(i);
+      const blob = new Blob([byteArr], { type: 'image/jpeg' });
+      const filename = `foto_${Date.now()}_${Math.random().toString(36).substr(2, 6)}.jpg`;
+      const response = await fetch(
+        `${SUPABASE_URL}/storage/v1/object/fotos/${filename}`,
+        {
+          method: 'POST',
+          headers: {
+            'Authorization': `Bearer ${SUPABASE_KEY}`,
+            'Content-Type': 'image/jpeg',
+            'x-upsert': 'true'
+          },
+          body: blob
+        }
+      );
+      if (response.ok) {
+        photoUrl = `${SUPABASE_URL}/storage/v1/object/public/fotos/${filename}`;
+        showToast('✓ Foto carregada!', 'success');
+      } else {
+        const err = await response.json();
+        console.error('Storage error:', err);
+        showToast('Erro ao carregar foto', 'error');
+        photoUrl = null;
+      }
+    } catch (err) {
+      console.error('Upload error:', err);
+      showToast('Erro ao carregar foto', 'error');
+      photoUrl = null;
+    }
+  }
+
+  function handlePhoto(event) {
+    const file = event.target.files[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = function(e) {
+      const img = new Image();
+      img.onload = function() {
+        const canvas = document.createElement('canvas');
+        const maxSize = 1200;
+        let w = img.width, h = img.height;
+        if (w > maxSize || h > maxSize) {
+          if (w > h) { h = Math.round(h * maxSize / w); w = maxSize; }
+          else { w = Math.round(w * maxSize / h); h = maxSize; }
+        }
+        canvas.width = w; canvas.height = h;
+        canvas.getContext('2d').drawImage(img, 0, 0, w, h);
+        photoData = canvas.toDataURL('image/jpeg', 0.8);
+        document.getElementById('photoImg').src = photoData;
+        document.getElementById('photoPreview').style.display = 'block';
+        showToast('⏳ A carregar foto...', '');
+        uploadFoto(photoData);
+      };
+      img.src = e.target.result;
+    };
+    reader.readAsDataURL(file);
+  }
+
+  function removePhoto() {
+    photoData = null; photoUrl = null;
+    document.getElementById('photoPreview').style.display = 'none';
+    document.getElementById('photoInput').value = '';
+  }
+
+  // ── LOCALIZAÇÃO ───────────────────────────────────────────
+  let lastMapLat = null, lastMapLon = null;
+
+  function initLocation() {
+    if (!navigator.geolocation) {
+      document.getElementById('mapContainer').innerHTML = `<div class="loading-map"><span style="color:var(--red)">Geolocalização não suportada</span></div>`;
+      return;
+    }
+    navigator.geolocation.watchPosition(
+      pos => {
+        userLat = pos.coords.latitude;
+        userLon = pos.coords.longitude;
+        if (!selectedPlace) {
+          const dist = lastMapLat ? Math.abs(userLat - lastMapLat) + Math.abs(userLon - lastMapLon) : 999;
+          if (dist > 0.0001) {
+            showMap(userLat, userLon);
+            lastMapLat = userLat;
+            lastMapLon = userLon;
+          }
+          document.getElementById('locationBadge').style.display = 'flex';
+          document.getElementById('locationText').textContent = `${userLat.toFixed(5)}, ${userLon.toFixed(5)}`;
+        }
+        updateSendBtn();
+      },
+      () => {
+        document.getElementById('mapContainer').innerHTML = `<div class="loading-map"><span style="color:var(--red);text-align:center;padding:20px">Permissão de localização negada.<br>Ativa nas definições do browser.</span></div>`;
+      },
+      { enableHighAccuracy: true, timeout: 10000, maximumAge: 30000 }
+    );
+  }
+
+  function showMap(lat, lon) {
+    const mapUrl = `https://www.openstreetmap.org/export/embed.html?bbox=${lon-0.003},${lat-0.002},${lon+0.003},${lat+0.002}&layer=mapnik&marker=${lat},${lon}`;
+    document.getElementById('mapContainer').innerHTML = `<iframe src="${mapUrl}" width="100%" height="100%" style="border:0;"></iframe>`;
+  }
+
+  // ── ENVIAR ────────────────────────────────────────────────
+  async function sendPush(phone, nome, viewUrl) {
+    try {
+      const res = await fetch(`${SUPABASE_URL}/functions/v1/swift-action`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'apikey': SUPABASE_KEY },
+        body: JSON.stringify({
+          phone,
+          title: `📍 ${userName || 'Alguém'} partilhou a localização`,
+          body: `Toca para ver onde está ${userName || 'Alguém'}`,
+          url: viewUrl
+        })
+      });
+      const data = await res.json();
+      return data.sent > 0;
+    } catch(e) { console.error('Push failed:', e); return false; }
+  }
+
+  async function hasToakiAccount(phone) {
+    try {
+      const res = await fetch(
+        `${SUPABASE_URL}/rest/v1/push_subscriptions?phone=eq.${encodeURIComponent(phone)}&select=id&limit=1`,
+        { headers: { 'apikey': SUPABASE_KEY } }
+      );
+      const data = await res.json();
+      return Array.isArray(data) && data.length > 0;
+    } catch { return false; }
+  }
+
+  async function sendLocation() {
+    if (selectedIds.size === 0) return;
+    const sendLat = selectedPlace ? selectedPlace.lat : userLat;
+    const sendLon = selectedPlace ? selectedPlace.lon : userLon;
+    if (sendLat == null) { showToast('Sem localizacao disponivel.', 'error'); return; }
+    const msg = document.getElementById('msgInput').value.trim();
+    const nome = encodeURIComponent(userName || 'Alguém');
+    const fromPhone = normalizePhone(currentUser?.user_metadata?.phone || localStorage.getItem('toaki_phone') || '');
+    const ts = Date.now();
+    const selected = contacts.filter(c => selectedIds.has(c.id));
+
+    showToast('⏳ A enviar...', '');
+
+    for (let i = 0; i < selected.length; i++) {
+      const c = selected[i];
+      const tel = normalizePhone(c.phone);
+      let viewUrl = `${BASE_URL}toaki_view.html?lat=${sendLat}&lon=${sendLon}&nome=${nome}&ts=${ts}&phone=${encodeURIComponent(tel)}&from=${encodeURIComponent(fromPhone)}`;
+      if (msg) viewUrl += `&msg=${encodeURIComponent(msg)}`;
+      if (photoUrl) viewUrl += `&photo=${encodeURIComponent(photoUrl)}`;
+
+      // Verificar se tem subscrição push ativa
+      const hasPush = await hasToakiAccount(tel);
+
+      if (hasPush) {
+        await sendPush(tel, c.name, viewUrl);
+        showToast(`✓ Enviado para ${c.name} por notificação!`, 'success');
+      } else {
+        let text = `📍 *TÔAKI* — ${userName || 'Alguém'} partilhou a localização!\nClica para ver:\n${viewUrl}`;
+        if (msg) text += `\n\n💬 ${msg}`;
+        const waUrl = `https://wa.me/${tel}?text=${encodeURIComponent(text)}`;
+        if (i === 0 && selected.length === 1) {
+          window.location.href = waUrl;
+        } else {
+          setTimeout(() => window.open(waUrl, '_blank'), i * 800);
+        }
+      }
+
+      // Guardar no histórico
+      await saveToHistory(tel, c.name, viewUrl);
+    }
+  }
+
+  // ── NAVEGAÇÃO ─────────────────────────────────────────────
+  let currentNav = 'enviar';
+  let currentHistoryTab = 'enviados';
+
+  function switchNav(tab) {
+    currentNav = tab;
+    document.getElementById('navEnviar').className = 'nav-tab' + (tab === 'enviar' ? ' active' : '');
+    document.getElementById('navHistorico').className = 'nav-tab' + (tab === 'historico' ? ' active' : '');
+    document.getElementById('navProg').className = 'nav-tab' + (tab === 'prognostico' ? ' active' : '');
+    document.querySelector('#appScreen > .map-wrap') && (document.querySelector('#appScreen > .map-wrap').closest('#appScreen').querySelectorAll(':scope > *:not(header):not(.nav-tabs):not(#historyScreen):not(#progScreen)').forEach(el => el.style.display = tab === 'enviar' ? '' : 'none'));
+    document.getElementById('historyScreen').style.display = tab === 'historico' ? 'flex' : 'none';
+    document.getElementById('progScreen').style.display = tab === 'prognostico' ? 'flex' : 'none';
+    if (tab === 'historico') loadHistory();
+    if (tab === 'prognostico') loadProg();
+  }
+
+  function switchHistoryTab(tab) {
+    currentHistoryTab = tab;
+    document.getElementById('tabEnviados').className = 'history-tab' + (tab === 'enviados' ? ' active' : '');
+    document.getElementById('tabRecebidos').className = 'history-tab' + (tab === 'recebidos' ? ' active' : '');
+    loadHistory();
+  }
+
+  // ── HISTÓRICO ─────────────────────────────────────────────
+  async function saveToHistory(receiverPhone, receiverName, viewUrl) {
+    try {
+      const userPhone = currentUser?.user_metadata?.phone || localStorage.getItem('toaki_phone') || '';
+      await fetch(`${SUPABASE_URL}/rest/v1/location_history`, {
+        method: 'POST',
+        headers: {
+          'apikey': SUPABASE_KEY,
+          'Authorization': `Bearer ${SUPABASE_KEY}`,
+          'Content-Type': 'application/json',
+          'Prefer': 'return=minimal'
+        },
+        body: JSON.stringify({
+          sender_phone: userPhone,
+          sender_name: userName,
+          receiver_phone: receiverPhone,
+          lat: userLat,
+          lon: userLon,
+          msg: document.getElementById('msgInput').value.trim(),
+          photo_url: photoUrl || null,
+          view_url: viewUrl
+        })
+      });
+    } catch(e) { console.error('Erro ao guardar histórico:', e); }
+  }
+
+  async function loadHistory() {
+    const list = document.getElementById('historyList');
+    list.innerHTML = '<div class="history-empty"><div class="spinner"></div></div>';
+
+    const userPhone = currentUser?.user_metadata?.phone || localStorage.getItem('toaki_phone') || '';
+    const phoneShort = userPhone.length > 9 ? userPhone.slice(-9) : userPhone;
+    const phoneLong = userPhone.length <= 9 ? '351' + userPhone : userPhone;
+
+    try {
+      if (currentHistoryTab === 'enviados') {
+        // Localizacoes enviadas
+        const res = await fetch(`${SUPABASE_URL}/rest/v1/location_history?sender_name=eq.${encodeURIComponent(userName)}&order=created_at.desc&limit=30`, {
+          headers: { 'apikey': SUPABASE_KEY }
+        });
+        const items = await res.json();
+
+        if (!Array.isArray(items) || !items.length) {
+          list.innerHTML = '<div class="history-empty"><div class="history-empty-icon">\uD83D\uDCCD</div><div>Ainda sem envios</div></div>';
+          return;
+        }
+
+        let html = '';
+        items.forEach(item => {
+          const thumb = item.photo_url ? '<img class="history-thumb" src="' + item.photo_url + '" onerror="this.style.display=\'none\'">' : '';
+          const detail = item.msg ? '\uD83D\uDCAC ' + item.msg : '\uD83D\uDCCD ' + (item.lat?.toFixed(4)||'') + ', ' + (item.lon?.toFixed(4)||'');
+          html += '<div class="history-item" onclick="window.open(\'' + item.view_url + '\', \'_blank\')">' +
+            '<div class="history-avatar">' + (item.receiver_phone||'?')[0] + '</div>' +
+            '<div class="history-info">' +
+              '<div class="history-name">\u2192 ' + item.receiver_phone + '</div>' +
+              '<div class="history-detail">' + detail + '</div>' +
+            '</div>' +
+            '<div style="display:flex;flex-direction:column;align-items:flex-end;gap:6px">' +
+              '<div class="history-time">' + formatHistoryTime(item.created_at) + '</div>' +
+              thumb +
+            '</div>' +
+          '</div>';
+        });
+        list.innerHTML = html;
+
+      } else {
+        // Recebidos: localizacoes recebidas + respostas recebidas
+        const res = await fetch(`${SUPABASE_URL}/rest/v1/location_history?receiver_phone=eq.${encodeURIComponent(userPhone)}&order=created_at.desc&limit=30`, {
+          headers: { 'apikey': SUPABASE_KEY }
+        });
+        const items = await res.json();
+
+        const resMsg = await fetch(`${SUPABASE_URL}/rest/v1/messages?or=(receiver_phone.eq.${encodeURIComponent(userPhone)},receiver_phone.eq.${encodeURIComponent(phoneShort)},receiver_phone.eq.${encodeURIComponent(phoneLong)})&order=created_at.desc&limit=30`, {
+          headers: { 'apikey': SUPABASE_KEY }
+        });
+        const msgs = await resMsg.json();
+
+        if ((!Array.isArray(items) || !items.length) && (!Array.isArray(msgs) || !msgs.length)) {
+          list.innerHTML = '<div class="history-empty"><div class="history-empty-icon">\uD83D\uDCCD</div><div>Ainda sem recebidos</div></div>';
+          return;
+        }
+
+        let html = '';
+
+        if (Array.isArray(msgs) && msgs.length) {
+          msgs.forEach(m => {
+            html += '<div class="history-item" style="border-color:rgba(46,204,113,0.2);background:rgba(46,204,113,0.04)">' +
+              '<div class="history-avatar" style="background:rgba(46,204,113,0.15);color:#2ECC71">' + (m.sender_name||'?')[0].toUpperCase() + '</div>' +
+              '<div class="history-info">' +
+                '<div class="history-name" style="color:#2ECC71">\u21A9 ' + (m.sender_name||'Alguem') + ' respondeu</div>' +
+                '<div class="history-detail">\uD83D\uDCAC ' + m.content + '</div>' +
+              '</div>' +
+              '<div class="history-time">' + formatHistoryTime(m.created_at) + '</div>' +
+            '</div>';
+          });
+        }
+
+        if (Array.isArray(items)) {
+          items.forEach(item => {
+            const thumb = item.photo_url ? '<img class="history-thumb" src="' + item.photo_url + '" onerror="this.style.display=\'none\'">' : '';
+            const detail = item.msg ? '\uD83D\uDCAC ' + item.msg : '\uD83D\uDCCD ' + (item.lat?.toFixed(4)||'') + ', ' + (item.lon?.toFixed(4)||'');
+            html += '<div class="history-item" onclick="window.open(\'' + item.view_url + '\', \'_blank\')">' +
+              '<div class="history-avatar">' + (item.sender_name||'?')[0].toUpperCase() + '</div>' +
+              '<div class="history-info">' +
+                '<div class="history-name">' + (item.sender_name||'Alguem') + '</div>' +
+                '<div class="history-detail">' + detail + '</div>' +
+              '</div>' +
+              '<div style="display:flex;flex-direction:column;align-items:flex-end;gap:6px">' +
+                '<div class="history-time">' + formatHistoryTime(item.created_at) + '</div>' +
+                thumb +
+              '</div>' +
+            '</div>';
+          });
+        }
+
+        list.innerHTML = html;
+      }
+    } catch(e) {
+      list.innerHTML = '<div class="history-empty"><div class="history-empty-icon">\u26A0\uFE0F</div><div>Erro ao carregar</div></div>';
+    }
+  }
+
+  function formatHistoryTime(ts) {
+    if (!ts) return '';
+    const d = new Date(ts);
+    const diff = Math.floor((Date.now() - d) / 60000);
+    if (diff < 1) return 'Agora';
+    if (diff < 60) return `${diff}min`;
+    if (diff < 1440) return `${Math.floor(diff/60)}h`;
+    if (diff < 10080) return `${Math.floor(diff/1440)}d`;
+    return d.toLocaleDateString('pt-PT', {day:'2-digit', month:'2-digit'});
+  }
+  function updateChar() { document.getElementById('charCount').textContent = document.getElementById('msgInput').value.length; }
+  // ===== O MEU PROGNOSTICO =====
+  let progIsAdmin = false, progGrupos = [], progParts = [], progMinhas = [], progHodes = [], progProntas = [], progRegistadas = [];
+
+  function progHeaders() { return { 'apikey': SUPABASE_KEY, 'Content-Type': 'application/json' }; }
+  function progMyPhone() {
+    return normalizePhone(currentUser?.user_metadata?.phone || localStorage.getItem('toaki_phone') || '');
+  }
+
+  async function loadProg() {
+    const box = document.getElementById('progScreen');
+    box.innerHTML = '<div class="prog-empty"><div class="spinner"></div></div>';
+    const myPhone = progMyPhone();
+    try {
+      if (currentUser?.id) {
+        const r = await fetch(SUPABASE_URL + '/rest/v1/profiles?id=eq.' + currentUser.id + '&select=is_admin', { headers: progHeaders() });
+        const d = await r.json();
+        progIsAdmin = Array.isArray(d) && d[0] && d[0].is_admin === true;
+      }
+      const [gr, pr, hd] = await Promise.all([
+        fetch(SUPABASE_URL + '/rest/v1/prog_grupos?ativo=eq.true&order=id.asc&select=*', { headers: progHeaders() }).then(r => r.json()),
+        fetch(SUPABASE_URL + '/rest/v1/prog_participantes?estado=in.(pendente,aceite)&order=posicao.asc&select=*', { headers: progHeaders() }).then(r => r.json()),
+        fetch(SUPABASE_URL + '/rest/v1/prog_hodes?ativo=eq.true&order=min_val.asc&select=*', { headers: progHeaders() }).then(r => r.json())
+      ]);
+      progGrupos = Array.isArray(gr) ? gr : [];
+      progParts = Array.isArray(pr) ? pr : [];
+      progHodes = Array.isArray(hd) ? hd : [];
+      if (progIsAdmin) {
+        const [prt, reg] = await Promise.all([
+          fetch(SUPABASE_URL + '/rest/v1/prog_prontas?select=*&order=data.asc', { headers: progHeaders() }).then(r => r.json()).catch(() => []),
+          fetch(SUPABASE_URL + '/rest/v1/prog_listas?estado=in.(registada,terminada)&select=*,prog_grupos(nome)&order=data.desc', { headers: progHeaders() }).then(r => r.json()).catch(() => [])
+        ]);
+        progProntas = Array.isArray(prt) ? prt : [];
+        progRegistadas = Array.isArray(reg) ? reg : [];
+      }
+      progMinhas = progParts.filter(p => normalizePhone(p.phone) === myPhone);
+      renderProg();
+    } catch (e) {
+      box.innerHTML = '<div class="prog-empty">Erro ao carregar. Verifica a ligacao.</div>';
+    }
+  }
+
+  let progBuscaTxt = '';
+  let progGrupoExpandido = null;
+  // configura aqui as instrucoes de pagamento MB WAY (numero/chave a preencher)
+  const MBWAY_INFO = 'PREENCHER: numero MB WAY';
+
+  // Formata valores: 20 -> "20" | 1.5 -> "1,5" | 2.25 -> "2,25"
+  function progFmt(v) {
+    const n = Number(v || 0);
+    if (!isFinite(n)) return '0';
+    const txt = (Math.round(n * 100) / 100).toFixed(2).replace(/\.?0+$/, '');
+    return txt.replace('.', ',');
+  }
+  // Le numeros aceitando virgula decimal (formato PT)
+  function progNum(txt) {
+    return parseFloat(String(txt || '').trim().replace(',', '.'));
+  }
+
+  function renderProg() {
+    const bInput = document.getElementById('progBusca'); if (bInput) progBuscaTxt = bInput.value;
+    const box = document.getElementById('progScreen');
+    let html = '';
+
+    // Botao criar sempre visivel
+    html += '<button class="prog-btn" onclick="progAbrirCriar()">+ Criar lista</button>';
+
+    const meusGrupos = [...new Set(progMinhas.map(p => p.grupo_id))];
+
+    // ----- Lista partilhada por link (?lista=ID) -----
+    let deepId = null;
+    try { deepId = parseInt(new URLSearchParams(location.search).get('lista'), 10) || null; } catch (e) {}
+    if (deepId && progGrupos.some(g => g.id === deepId) && meusGrupos.indexOf(deepId) < 0) {
+      html += '<div class="section-label" style="margin:14px 4px 6px">Lista partilhada contigo</div>';
+      html += progGrupoCard(deepId, true);
+    }
+
+    // ----- As minhas listas (onde ocupo posicoes) -----
+    html += '<div class="section-label" style="margin:14px 4px 6px">As minhas listas</div>';
+    if (meusGrupos.length) {
+      meusGrupos.forEach(gid => { html += progGrupoCard(gid, true); });
+    } else {
+      html += '<div class="prog-empty">Ainda nao ocupas nenhuma posicao.<br>Cria uma lista ou procura uma disponivel.</div>';
+    }
+
+    // ----- Procurar listas disponiveis (com posicoes livres) -----
+    html += '<div class="section-label" style="margin:16px 4px 6px">Procurar listas disponiveis</div>';
+    html += '<input class="place-input" id="progBusca" placeholder="Procurar lista pelo nome..." oninput="renderProg()" value="' + (progBuscaTxt || '') + '">';
+    const termo = (progBuscaTxt || '').trim().toLowerCase();
+    const disponiveis = progGrupos.filter(g => {
+      const ocup = progParts.filter(p => p.grupo_id === g.id).length;
+      const completa = ocup >= 8;                       // listas cheias nunca aparecem
+      const jaEstou = meusGrupos.indexOf(g.id) >= 0;
+      const bateNome = !termo || (g.nome || '').toLowerCase().indexOf(termo) >= 0;
+      return !completa && !jaEstou && bateNome;
+    });
+    if (!disponiveis.length) {
+      html += '<div class="prog-empty">' + (termo ? 'Nenhuma lista disponivel com esse nome.' : 'Nao ha listas disponiveis.') + '</div>';
+    } else {
+      disponiveis.forEach(g => {
+        if (progGrupoExpandido === g.id) { html += progGrupoCard(g.id, true); return; }
+        const ocup = progParts.filter(p => p.grupo_id === g.id).length;
+        const hodeTxt = (g.hode_min != null) ? (' \u00B7 hode ' + progFmt(g.hode_min) + '\u2013' + progFmt(g.hode_max) + '\u20AC') : '';
+        html += '<div class="prog-card" style="padding:12px;cursor:pointer" onclick="progToggleGrupo(' + g.id + ')">' +
+                  '<div style="display:flex;align-items:center;gap:10px">' +
+                    '<div style="flex:1">' +
+                      '<div class="prog-card-title" style="font-size:14px;margin-bottom:2px">' + g.nome + '</div>' +
+                      '<div class="prog-sub">' + (8 - ocup) + ' posicoes livres' + hodeTxt + '</div>' +
+                    '</div>' +
+                    '<div class="prog-pos-tag" style="color:var(--red)">Ver</div>' +
+                  '</div>' +
+                '</div>';
+      });
+    }
+
+    if (progIsAdmin) html += progAdminPanel();
+    box.innerHTML = html;
+  }
+
+  function progToggleGrupo(id) {
+    progGrupoExpandido = (progGrupoExpandido === id) ? null : id;
+    renderProg();
+  }
+
+  function progGrupoCard(grupoId, permitirInscricao) {
+    const g = progGrupos.find(x => x.id === grupoId);
+    if (!g) return '';
+    const ocupadas = {};
+    progParts.filter(p => p.grupo_id === grupoId).forEach(p => { ocupadas[p.posicao] = p; });
+    const myPhone = progMyPhone();
+    const minhasAqui = progMinhas.filter(p => p.grupo_id === grupoId);
+    const nOcupadas = Object.keys(ocupadas).length;
+    const quota = nOcupadas > 0 ? Number(g.creditos || 0) / nOcupadas : 0;
+    const hodeTxt = (g.hode_min != null) ? (' &middot; hode ' + progFmt(g.hode_min) + '\u2013' + progFmt(g.hode_max) + '\u20AC') : '';
+    const nOcup = Object.keys(ocupadas).length;
+    let h = '<div class="prog-card"><div class="prog-card-title">' + g.nome + '</div>' +
+            '<div class="prog-sub">' + nOcup + '/8 posicoes &middot; ' + progFmt(g.creditos) + ' creditos' + hodeTxt + '</div>';
+    if (minhasAqui.length) {
+      const meusCreditos = quota * minhasAqui.length;
+      h += '<div class="prog-badges">' +
+             '<div class="prog-badge"><div class="prog-badge-val">' + minhasAqui.length + '</div><div class="prog-badge-lbl">Minhas posicoes</div></div>' +
+             '<div class="prog-badge"><div class="prog-badge-val">' + progFmt(meusCreditos) + '\u20AC</div><div class="prog-badge-lbl">Os meus creditos</div></div>' +
+           '</div>';
+    }
+    const souDono = g.criado_por && normalizePhone(g.criado_por) === myPhone;
+    for (let i = 1; i <= 8; i++) {
+      const p = ocupadas[i];
+      if (p) {
+        const eu = normalizePhone(p.phone) === myPhone;
+        const euPendente = eu && p.estado === 'pendente';
+        const euAceite = eu && p.estado === 'aceite';
+        let acao;
+        if (euPendente) {
+          acao = '<button class="prog-btn-sm" onclick="progComoPagar()">Como pagar</button>';
+        } else if (euAceite) {
+          acao = '<button class="prog-btn-sm" style="background:' + (p.aberta ? 'var(--mid);border:1px solid var(--border)' : '#2ECC71') + '" onclick="progAbrirParticipacao(' + grupoId + ',' + i + ',' + (p.aberta ? 'false' : 'true') + ')">' + (p.aberta ? 'Fechar' : 'Abrir a outros') + '</button>';
+        } else {
+          acao = '<div class="prog-pos-tag">' + (p.estado === 'pendente' ? 'Pendente' : '') + '</div>';
+        }
+        h += '<div class="prog-pos' + (eu ? ' minha' : '') + '">' +
+               '<div class="prog-pos-num">' + i + '</div>' +
+               '<div class="prog-pos-name">' + p.nome +
+                 (euPendente ? '<div class="prog-sub" style="color:var(--red)">A aguardar aceitacao</div>' : '') +
+                 (p.aberta ? ' <span class="prog-tag-open">aberta</span>' : '') +
+               '</div>' +
+               acao +
+             '</div>';
+      } else if (permitirInscricao) {
+        h += '<div class="prog-pos livre" onclick="progInscrever(' + grupoId + ',' + i + ')">' +
+               '<div class="prog-pos-num">' + i + '</div>' +
+               '<div class="prog-pos-name" style="color:var(--muted)">Posicao livre</div>' +
+               '<div class="prog-pos-tag" style="color:var(--red)">Inscrever</div>' +
+             '</div>';
+      } else {
+        h += '<div class="prog-pos"><div class="prog-pos-num">' + i + '</div>' +
+             '<div class="prog-pos-name" style="color:var(--muted)">Livre</div></div>';
+      }
+    }
+    if (minhasAqui.some(p => p.estado === 'aceite')) {
+      h += '<button class="prog-btn" onclick="progAbrirPrognosticos(' + grupoId + ')">Prognosticos</button>';
+    }
+    if (souDono && nOcup < 8) {
+      h += '<button class="prog-btn" style="background:#25D366" onclick="progPartilhar(' + grupoId + ')">Convidar por WhatsApp</button>';
+    }
+    return h + '</div>';
+  }
+
+  function progPartilhar(grupoId) {
+    const g = progGrupos.find(x => x.id === grupoId);
+    if (!g) return;
+    const ocup = progParts.filter(p => p.grupo_id === grupoId).length;
+    const url = BASE_URL + 'toaki.html?lista=' + grupoId;
+    const txt = 'Junta-te à minha lista "' + g.nome + '" no TÔAKI \u2014 O MEU PROGNÓSTICO.\n\n' +
+                'Posições livres: ' + (8 - ocup) + '/8\n' +
+                'Valor da hode: ' + progFmt(g.hode_min) + '\u2013' + progFmt(g.hode_max) + '\u20AC\n\n' +
+                'Escolhe a tua posição aqui: ' + url;
+    window.open('https://wa.me/?text=' + encodeURIComponent(txt), '_blank');
+  }
+
+  // ===== LISTAS DIARIAS DE PROGNOSTICOS =====
+  let progListaGrupo = null, progListaId = null, progListaRows = [], progListaFechada = false, progLinhaAberta = null;
+
+  function progAbrirPrognosticos(grupoId) {
+    progListaGrupo = grupoId;
+    const g = progGrupos.find(x => x.id === grupoId);
+    document.getElementById('progListaTitulo').textContent = g ? g.nome : 'Lista';
+    const hoje = new Date();
+    const iso = new Date(hoje.getTime() - hoje.getTimezoneOffset() * 60000).toISOString().slice(0, 10);
+    document.getElementById('progDataInput').value = iso;
+    document.getElementById('prognosticosOverlay').classList.add('open');
+    progCarregarDia();
+  }
+  function progFecharPrognosticos() {
+    document.getElementById('prognosticosOverlay').classList.remove('open');
+  }
+
+  async function progCarregarDia() {
+    const data = document.getElementById('progDataInput').value;
+    const body = document.getElementById('progListaBody');
+    if (!data || !progListaGrupo) return;
+    body.innerHTML = '<div class="prog-empty"><div class="spinner"></div></div>';
+    try {
+      const r = await fetch(SUPABASE_URL + '/rest/v1/rpc/prog_criar_lista', {
+        method: 'POST', headers: progHeaders(),
+        body: JSON.stringify({ p_grupo: progListaGrupo, p_data: data })
+      });
+      if (!r.ok) { body.innerHTML = '<div class="prog-empty">Erro ao abrir a lista do dia.</div>'; return; }
+      progListaId = await r.json();
+
+      const [info, rows] = await Promise.all([
+        fetch(SUPABASE_URL + '/rest/v1/prog_listas?id=eq.' + progListaId + '&select=*', { headers: progHeaders() }).then(x => x.json()),
+        fetch(SUPABASE_URL + '/rest/v1/prog_prognosticos?lista_id=eq.' + progListaId + '&order=posicao.asc&select=*', { headers: progHeaders() }).then(x => x.json())
+      ]);
+      progListaRows = Array.isArray(rows) ? rows : [];
+      const infoRow = (Array.isArray(info) && info[0]) ? info[0] : null;
+      const fecha = infoRow ? infoRow.fecha_em : null;
+      const estado = infoRow ? infoRow.estado : 'aberta';
+      const porHora = fecha ? (new Date(fecha) <= new Date()) : false;
+      const porEstado = (estado === 'registada' || estado === 'terminada');
+      progListaFechada = porHora || porEstado;   // registada/terminada => nao editavel
+      const el = document.getElementById('progFechoInfo');
+      if (porEstado) {
+        el.textContent = estado === 'terminada' ? 'Lista terminada \u2014 nao editavel' : 'Lista registada \u2014 nao editavel';
+        el.className = 'prog-fecho fechada';
+      } else if (fecha) {
+        const d = new Date(fecha);
+        const txt = d.toLocaleDateString('pt-PT') + ' as ' + d.toLocaleTimeString('pt-PT', { hour: '2-digit', minute: '2-digit' });
+        el.textContent = porHora ? 'Lista fechada desde ' + txt : 'Fecha a ' + txt;
+        el.className = 'prog-fecho' + (porHora ? ' fechada' : '');
+      } else { el.textContent = ''; }
+      progRenderDia();
+    } catch (e) {
+      body.innerHTML = '<div class="prog-empty">Erro de ligacao.</div>';
+    }
+  }
+
+  function progToggleLinha(i) {
+    progLinhaAberta = (progLinhaAberta === i) ? null : i;
+    progRenderDia();
+  }
+
+  function progRenderDia() {
+    const myPhone = progMyPhone();
+    const souAceite = progParts.some(p => p.grupo_id === progListaGrupo && normalizePhone(p.phone) === myPhone && p.estado === 'aceite');
+    let html = '';
+    for (let i = 1; i <= 8; i++) {
+      const row = progListaRows.find(r => r.posicao === i) || { posicao: i };
+      const part = progParts.find(p => p.grupo_id === progListaGrupo && p.posicao === i && p.estado === 'aceite');
+      const euDono = part && normalizePhone(part.phone) === myPhone;
+      const aberta = part && part.aberta === true;
+      const editavel = souAceite && !progListaFechada && (euDono || aberta);
+      const expandida = progLinhaAberta === i && editavel;
+      const temDados = row.codigo_jogo || row.prognostico || row.valor != null;
+
+      // Cabecalho da linha (SEM numero de posicao, para nao identificar)
+      let etiqueta;
+      if (euDono) etiqueta = '<span style="color:var(--red);font-weight:700">A MINHA POSICAO</span>' + (aberta ? ' <span class="prog-tag-open">aberta</span>' : '');
+      else if (aberta) etiqueta = '<span class="prog-tag-open">POSICAO ABERTA</span>';
+      else etiqueta = '<span style="color:var(--muted);font-size:11px;letter-spacing:0.08em">PROGNOSTICO</span>';
+
+      html += '<div class="prog-row' + (euDono ? ' eu' : '') + (editavel ? ' clic' : '') + '"' +
+              (editavel ? ' onclick="progToggleLinha(' + i + ')"' : '') + '>' +
+        '<div class="prog-row-head">' +
+          '<div class="prog-row-label">' + etiqueta + '</div>' +
+          (editavel ? '<div class="prog-edit-tag">' + (expandida ? 'FECHAR' : 'EDITAR') + '</div>' : '') +
+        '</div>';
+
+      if (temDados) {
+        html += '<div class="prog-cells">' +
+          '<div class="prog-cell"><div class="prog-cell-lbl">Jogo</div><div class="prog-cell-val">' + (row.codigo_jogo || '\u2014') + '</div></div>' +
+          '<div class="prog-cell" style="flex:2"><div class="prog-cell-lbl">Prognostico</div><div class="prog-cell-val">' + (row.prognostico || '\u2014') + '</div></div>' +
+          '<div class="prog-cell"><div class="prog-cell-lbl">Valor</div><div class="prog-cell-val">' + (row.valor != null ? progFmt(row.valor) + '\u20AC' : '\u2014') + '</div></div>' +
+        '</div>';
+      } else {
+        html += '<div class="prog-vazia">Por preencher</div>';
+      }
+
+      if (expandida) {
+        html += '<div class="prog-edit" onclick="event.stopPropagation()">' +
+          '<input class="prog-in" id="pc_' + i + '" placeholder="Codigo do jogo" value="' + (row.codigo_jogo || '') + '">' +
+          '<input class="prog-in" id="pp_' + i + '" placeholder="Prognostico" value="' + (row.prognostico || '') + '">' +
+          '<div class="prog-in-row">' +
+            '<input class="prog-in" id="pv_' + i + '" inputmode="decimal" placeholder="Valor" value="' + (row.valor != null ? progFmt(row.valor) : '') + '">' +
+            '<button class="prog-btn-sm" style="height:42px;padding:0 18px" onclick="progGuardarLinha(' + i + ')">Guardar</button>' +
+          '</div>' +
+        '</div>';
+      }
+      html += '</div>';
+    }
+    document.getElementById('progListaBody').innerHTML = html;
+  }
+
+  async function progGuardarLinha(posicao) {
+    const codigo = document.getElementById('pc_' + posicao).value.trim();
+    const prog = document.getElementById('pp_' + posicao).value.trim();
+    const valTxt = document.getElementById('pv_' + posicao).value.trim();
+    if (!codigo) { alert('Falta o codigo do jogo.'); return; }
+    if (!prog) { alert('Falta o prognostico.'); return; }
+    if (!valTxt) { alert('Falta o valor.'); return; }
+    const valor = progNum(valTxt);
+    if (isNaN(valor)) { alert('Valor invalido. Escreve um numero (ex: 2,5).'); return; }
+    const gr = progGrupos.find(x => x.id === progListaGrupo);
+    if (valor != null && gr && gr.hode_min != null) {
+      const mn = Number(gr.hode_min), mx = Number(gr.hode_max);
+      if (valor < mn || valor > mx) {
+        alert('VALOR FORA DO INTERVALO\n\nNesta lista o valor tem de estar entre ' + progFmt(mn) + '\u20AC e ' + progFmt(mx) + '\u20AC.\n\nInseriste: ' + progFmt(valor) + '\u20AC');
+        return;
+      }
+    }
+    try {
+      const r = await fetch(SUPABASE_URL + '/rest/v1/rpc/prog_guardar_prognostico', {
+        method: 'POST', headers: progHeaders(),
+        body: JSON.stringify({
+          p_lista: progListaId, p_posicao: posicao, p_codigo: codigo,
+          p_prognostico: prog, p_valor: valor, p_phone: progMyPhone()
+        })
+      });
+      if (r.ok) { showToast('\u2713 Guardado.', 'success'); progLinhaAberta = null; progCarregarDia(); }
+      else {
+        const d = await r.json().catch(() => ({}));
+        alert(d.message || 'Erro ao guardar.');
+      }
+    } catch (e) { showToast('Erro de ligacao.', 'error'); }
+  }
+
+
+  async function progAbrirParticipacao(grupoId, posicao, abrir) {
+    try {
+      const r = await fetch(SUPABASE_URL + '/rest/v1/rpc/prog_abrir_posicao_part', {
+        method: 'POST', headers: progHeaders(),
+        body: JSON.stringify({ p_grupo: grupoId, p_posicao: posicao, p_abrir: abrir, p_phone: progMyPhone() })
+      });
+      if (r.ok) { showToast(abrir ? 'Posicao aberta a outros.' : 'Posicao fechada.', 'success'); loadProg(); }
+      else { const d = await r.json().catch(() => ({})); alert(d.message || 'Erro.'); }
+    } catch (e) { showToast('Erro de ligacao.', 'error'); }
+  }
+
+  // ===== ADMIN: registar / terminar com foto e creditos =====
+  let progAdminLista = null, progAdminAcao = null, progAdminFotoUrl = null;
+
+  let lpDados = [];
+  async function verListaPronta(listaId, nome, data) {
+    document.getElementById('lpTitulo').textContent = nome || 'Lista pronta';
+    document.getElementById('lpSub').textContent = data ? ('Data: ' + data) : '';
+    const body = document.getElementById('lpBody');
+    body.innerHTML = '<div class="prog-empty"><div class="spinner"></div></div>';
+    document.getElementById('listaProntaOverlay').classList.add('open');
+    try {
+      const rows = await fetch(SUPABASE_URL + '/rest/v1/prog_prognosticos?lista_id=eq.' + listaId + '&order=posicao.asc&select=posicao,codigo_jogo,prognostico,valor', { headers: progHeaders() }).then(r => r.json());
+      lpDados = rows || [];
+      let h = '';
+      lpDados.forEach(r => {
+        h += '<div class="lp-row">' +
+               '<div class="lp-num">' + r.posicao + '</div>' +
+               '<div><div class="lp-cell-lbl">Codigo do jogo</div><div class="lp-cell-val">' + (r.codigo_jogo || '\u2014') + '</div></div>' +
+               '<div><div class="lp-cell-lbl">Prognostico</div><div class="lp-cell-val">' + (r.prognostico || '\u2014') + '</div></div>' +
+               '<div class="lp-val">' + (r.valor != null ? progFmt(r.valor) + '\u20AC' : '') + '</div>' +
+             '</div>';
+      });
+      body.innerHTML = h || '<div class="prog-empty">Sem linhas.</div>';
+    } catch (e) { body.innerHTML = '<div class="prog-empty">Erro ao carregar.</div>'; }
+  }
+  function fecharListaPronta() {
+    document.getElementById('listaProntaOverlay').classList.remove('open');
+  }
+  function copiarListaPronta() {
+    const linhas = lpDados.map(r => r.posicao + ') ' + (r.codigo_jogo||'-') + ' ' + (r.prognostico||'-') + (r.valor!=null? ' '+progFmt(r.valor)+'EUR':''));
+    const txt = linhas.join('\n');
+    if (navigator.clipboard) { navigator.clipboard.writeText(txt).then(()=>showToast('\u2713 Lista copiada!','success')).catch(()=>showToast('Nao foi possivel copiar','error')); }
+    else showToast('Copia nao suportada','error');
+  }
+
+  async function progAdminAbrir(listaId, acao) {
+    progAdminLista = listaId; progAdminAcao = acao; progAdminFotoUrl = null;
+    const l = (acao === 'registar')
+      ? progProntas.find(x => x.id === listaId)
+      : progRegistadas.find(x => x.id === listaId);
+    document.getElementById('progAdminTitulo').textContent = acao === 'registar' ? 'Registar lista' : 'Resultado (ganhos)';
+    document.getElementById('progAdminSub').textContent = l ? ((l.grupo_nome || (l.prog_grupos && l.prog_grupos.nome) || '') + ' \u00B7 ' + l.data) : '';
+    // Mostrar os prognosticos da lista (para o admin fazer o registo)
+    const pv = document.getElementById('progAdminProgs');
+    pv.innerHTML = '<div class="prog-sub">A carregar prognosticos...</div>';
+    try {
+      const rows = await fetch(SUPABASE_URL + '/rest/v1/prog_prognosticos?lista_id=eq.' + listaId + '&order=posicao.asc&select=posicao,codigo_jogo,prognostico,valor', { headers: progHeaders() }).then(r => r.json());
+      let hh = '';
+      (rows || []).forEach(r => {
+        hh += '<div class="prog-pos" style="margin-top:6px">' +
+                '<div class="prog-pos-num">' + r.posicao + '</div>' +
+                '<div class="prog-pos-name" style="font-size:12px">Jogo <b>' + (r.codigo_jogo || '\u2014') + '</b> \u00B7 ' + (r.prognostico || '\u2014') + '</div>' +
+                '<div class="prog-pos-tag">' + (r.valor != null ? progFmt(r.valor) + '\u20AC' : '') + '</div>' +
+              '</div>';
+      });
+      pv.innerHTML = hh || '<div class="prog-sub">Sem linhas.</div>';
+    } catch (e) { pv.innerHTML = '<div class="prog-sub">Erro ao carregar.</div>'; }
+    document.getElementById('progAdminValor').value = '';
+    document.getElementById('progAdminValor').placeholder = acao === 'registar' ? 'Valor do registo' : 'Valor dos ganhos';
+    document.getElementById('progAdminFotoPrev').style.display = 'none';
+    const b = document.getElementById('progAdminBtn'); b.disabled = true; b.style.opacity = '0.5';
+    document.getElementById('progAdminBtn').textContent = acao === 'registar' ? 'Registar e retirar creditos' : 'Terminar e creditar';
+    document.getElementById('progAdminModal').classList.add('open');
+  }
+
+  function progAdminFoto(event) {
+    const file = event.target.files[0];
+    if (!file) return;
+    showToast('\u23F3 A carregar foto...', '');
+    const reader = new FileReader();
+    reader.onload = function(e) {
+      const img = new Image();
+      img.onload = async function() {
+        const canvas = document.createElement('canvas');
+        const maxSize = 1200; let w = img.width, h = img.height;
+        if (w > maxSize || h > maxSize) { if (w > h) { h = Math.round(h * maxSize / w); w = maxSize; } else { w = Math.round(w * maxSize / h); h = maxSize; } }
+        canvas.width = w; canvas.height = h;
+        canvas.getContext('2d').drawImage(img, 0, 0, w, h);
+        const dataUrl = canvas.toDataURL('image/jpeg', 0.8);
+        document.getElementById('progAdminImg').src = dataUrl;
+        document.getElementById('progAdminFotoPrev').style.display = 'block';
+        try {
+          const b64 = dataUrl.split(',')[1];
+          const bin = atob(b64); const arr = new Uint8Array(bin.length);
+          for (let i = 0; i < bin.length; i++) arr[i] = bin.charCodeAt(i);
+          const filename = 'reg_' + Date.now() + '_' + Math.random().toString(36).substr(2, 6) + '.jpg';
+          const r = await fetch(SUPABASE_URL + '/storage/v1/object/fotos/' + filename, {
+            method: 'POST',
+            headers: { 'Authorization': 'Bearer ' + SUPABASE_KEY, 'Content-Type': 'image/jpeg', 'x-upsert': 'true' },
+            body: new Blob([arr], { type: 'image/jpeg' })
+          });
+          if (r.ok) {
+            progAdminFotoUrl = SUPABASE_URL + '/storage/v1/object/public/fotos/' + filename;
+            showToast('\u2713 Foto carregada!', 'success');
+            const b = document.getElementById('progAdminBtn'); b.disabled = false; b.style.opacity = '1';
+          } else { showToast('Erro ao carregar foto.', 'error'); }
+        } catch (err) { showToast('Erro ao carregar foto.', 'error'); }
+      };
+      img.src = e.target.result;
+    };
+    reader.readAsDataURL(file);
+  }
+
+  async function progAdminConfirmar() {
+    const valor = progNum(document.getElementById('progAdminValor').value);
+    if (isNaN(valor)) { alert('Escreve o valor.'); return; }
+    if (!progAdminFotoUrl) { alert('Carrega a foto primeiro.'); return; }
+    const rpc = progAdminAcao === 'registar' ? 'prog_registar_lista' : 'prog_terminar_lista';
+    try {
+      const r = await fetch(SUPABASE_URL + '/rest/v1/rpc/' + rpc, {
+        method: 'POST', headers: progHeaders(),
+        body: JSON.stringify({ p_lista: progAdminLista, p_valor: valor, p_foto: progAdminFotoUrl, p_por: progMyPhone() })
+      });
+      if (r.ok) {
+        showToast('\u2713 Feito. A enviar foto aos participantes...', 'success');
+        document.getElementById('progAdminModal').classList.remove('open');
+        progEnviarFotoParticipantes();
+        loadProg();
+      } else { const d = await r.json().catch(() => ({})); alert(d.message || 'Erro.'); }
+    } catch (e) { showToast('Erro de ligacao.', 'error'); }
+  }
+
+  async function progEnviarFotoParticipantes() {
+    try {
+      const lista = progProntas.find(x => x.id === progAdminLista) || progRegistadas.find(x => x.id === progAdminLista);
+      const grupoId = lista ? lista.grupo_id : null;
+      if (!grupoId || !progAdminFotoUrl) return;
+      const g = progGrupos.find(x => x.id === grupoId);
+      const titulo = progAdminAcao === 'registar' ? 'Registo da lista' : 'Resultado da lista';
+      const phones = [...new Set(progParts.filter(p => p.grupo_id === grupoId && p.estado === 'aceite').map(p => normalizePhone(p.phone)))];
+      for (const ph of phones) {
+        try {
+          await fetch(SUPABASE_URL + '/functions/v1/swift-action', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json', 'apikey': SUPABASE_KEY },
+            body: JSON.stringify({
+              phone: ph,
+              title: '\uD83D\uDCF8 ' + titulo + (g ? ' - ' + g.nome : ''),
+              body: 'Toca para ver a foto ' + (progAdminAcao === 'registar' ? 'do registo' : 'do resultado') + '.',
+              url: progAdminFotoUrl
+            })
+          });
+        } catch (e) {}
+      }
+    } catch (e) { console.error('envio foto:', e); }
+  }
+
+  function progComoPagar() {
+    const nome = userName || 'o teu nome';
+    alert('COMO PAGAR (MB WAY)\n\n' + MBWAY_INFO + '\n\nValor: 20\u20AC por posicao.\n\nIMPORTANTE: nas observacoes do pagamento escreve o teu nome: "' + nome + '"\n\nApos o pagamento, a administracao aceita a tua posicao.');
+  }
+
+  function progAdminPanel() {
+    const pend = progParts.filter(p => p.estado === 'pendente');
+    let h = '<div class="prog-card prog-admin"><div class="prog-card-title">Intervalos de hode</div>';
+    if (!progHodes.length) h += '<div class="prog-sub">Sem intervalos. Cria o primeiro.</div>';
+    progHodes.forEach(hd => {
+      h += '<div class="prog-pos" style="margin-top:8px">' +
+             '<div class="prog-pos-name">' + progFmt(hd.min_val) + '\u2013' + progFmt(hd.max_val) + '\u20AC</div>' +
+             '<div class="place-del" onclick="progRemoverHode(' + hd.id + ')">\u00D7</div>' +
+           '</div>';
+    });
+    h += '<div style="display:flex;gap:8px;margin-top:10px">' +
+           '<input class="place-input" id="hodeMin" type="text" inputmode="decimal" placeholder="Min" style="margin-bottom:0">' +
+           '<input class="place-input" id="hodeMax" type="text" inputmode="decimal" placeholder="Max" style="margin-bottom:0">' +
+           '<button class="prog-btn-sm" onclick="progAddHode()">Add</button>' +
+         '</div>';
+    h += '</div>';
+
+    // LISTA DE PRONTAS (a registar)
+    h += '<div class="prog-card prog-admin"><div class="prog-card-title">Lista de prontas (' + progProntas.length + ')</div>';
+    if (!progProntas.length) h += '<div class="prog-sub">Nenhuma lista pronta.</div>';
+    progProntas.forEach(l => {
+      h += '<div class="prog-pos" style="margin-top:8px">' +
+             '<div class="prog-pos-name">' + l.grupo_nome + '<div class="prog-sub">' + l.data + '</div></div>' +
+             '<button class="prog-btn-sm" style="background:var(--mid);border:1px solid var(--border);margin-right:6px" onclick="verListaPronta(' + l.id + ',\'' + (l.grupo_nome||'') + '\',\'' + l.data + '\')">Ver lista</button>' +
+             '<button class="prog-btn-sm" onclick="progAdminAbrir(' + l.id + ',\'registar\')">Registar</button>' +
+           '</div>';
+    });
+    h += '</div>';
+
+    // REGISTADAS (a terminar) e TERMINADAS
+    const regs = progRegistadas.filter(l => l.estado === 'registada');
+    const terms = progRegistadas.filter(l => l.estado === 'terminada');
+    h += '<div class="prog-card prog-admin"><div class="prog-card-title">Registadas (' + regs.length + ')</div>';
+    if (!regs.length) h += '<div class="prog-sub">Nenhuma.</div>';
+    regs.forEach(l => {
+      h += '<div class="prog-pos" style="margin-top:8px">' +
+             '<div class="prog-pos-name">' + (l.prog_grupos ? l.prog_grupos.nome : '') + '<div class="prog-sub">' + l.data + ' \u00B7 registo ' + progFmt(l.valor_registo) + '\u20AC</div></div>' +
+             '<button class="prog-btn-sm" onclick="progAdminAbrir(' + l.id + ',\'terminar\')">Resultado</button>' +
+           '</div>';
+    });
+    h += '</div>';
+    if (terms.length) {
+      h += '<div class="prog-card prog-admin"><div class="prog-card-title">Terminadas (' + terms.length + ')</div>';
+      terms.forEach(l => {
+        const saldo = Number(l.valor_ganhos || 0) - Number(l.valor_registo || 0);
+        h += '<div class="prog-pos" style="margin-top:8px">' +
+               '<div class="prog-pos-name">' + (l.prog_grupos ? l.prog_grupos.nome : '') + '<div class="prog-sub">' + l.data + ' \u00B7 registo ' + progFmt(l.valor_registo) + '\u20AC \u00B7 ganhos ' + progFmt(l.valor_ganhos) + '\u20AC</div></div>' +
+               '<div class="prog-pos-tag" style="color:' + (saldo >= 0 ? '#2ECC71' : 'var(--red)') + '">' + (saldo >= 0 ? '+' : '') + progFmt(saldo) + '\u20AC</div>' +
+             '</div>';
+      });
+      h += '</div>';
+    }
+
+    h += '<div class="prog-card prog-admin"><div class="prog-card-title">Inscricoes</div>';
+    if (!pend.length) {
+      h += '<div class="prog-sub">Sem inscricoes pendentes.</div>';
+    } else {
+      h += '<div class="prog-sub">' + pend.length + ' inscricao(oes) a aguardar.</div>';
+      pend.forEach(p => {
+        const g = progGrupos.find(x => x.id === p.grupo_id);
+        h += '<div class="prog-pos" style="margin-top:10px">' +
+               '<div class="prog-pos-num">' + p.posicao + '</div>' +
+               '<div class="prog-pos-name">' + p.nome + '<div class="prog-sub">' + (g ? g.nome : '') + ' &middot; ' + p.phone + '</div></div>' +
+               '<button class="prog-btn-sm" onclick="progAceitar(' + p.id + ')">Aceitar</button>' +
+             '</div>';
+      });
+    }
+    return h + '</div>';
+  }
+
+  function progAbrirCriar() {
+    if (!progHodes.length) { showToast('Ainda nao ha intervalos de hode definidos.', 'error'); return; }
+    const opts = progHodes.map(h => progFmt(h.min_val) + '-' + progFmt(h.max_val) + ' EUR').join('\n');
+    const nome = prompt('Nome da lista:');
+    if (nome === null || !nome.trim()) return;
+    let idx = prompt('Escolhe o intervalo de hode (escreve o numero):\n\n' + progHodes.map((h,i) => (i+1) + ') ' + progFmt(h.min_val) + '-' + progFmt(h.max_val) + ' EUR').join('\n'));
+    idx = parseInt(idx, 10);
+    if (!idx || idx < 1 || idx > progHodes.length) { showToast('Intervalo invalido.', 'error'); return; }
+    progCriarGrupo(nome.trim(), progHodes[idx-1].id);
+  }
+  async function progCriarGrupo(nome, hodeId) {
+    const myPhone = progMyPhone();
+    if (!myPhone) { showToast('Falta o teu numero no perfil.', 'error'); return; }
+    try {
+      const res = await fetch(SUPABASE_URL + '/rest/v1/rpc/prog_criar_grupo', {
+        method: 'POST', headers: progHeaders(),
+        body: JSON.stringify({ p_nome: nome, p_hode_id: hodeId, p_phone: myPhone, p_participante_nome: userName || 'Participante' })
+      });
+      if (res.ok) { showToast('\u2713 Lista criada! A aguardar aceitacao.', 'success'); loadProg(); }
+      else { showToast('Erro ao criar a lista.', 'error'); }
+    } catch (e) { showToast('Erro de ligacao.', 'error'); }
+  }
+  async function progAddHode() {
+    const mn = progNum(document.getElementById('hodeMin').value);
+    const mx = progNum(document.getElementById('hodeMax').value);
+    if (isNaN(mn) || isNaN(mx) || mx < mn) { showToast('Intervalo invalido.', 'error'); return; }
+    try {
+      const res = await fetch(SUPABASE_URL + '/rest/v1/prog_hodes', {
+        method: 'POST', headers: Object.assign(progHeaders(), { 'Prefer': 'return=minimal' }),
+        body: JSON.stringify({ min_val: mn, max_val: mx })
+      });
+      if (res.ok) { showToast('\u2713 Intervalo criado.', 'success'); loadProg(); }
+      else { showToast('Erro ao criar intervalo.', 'error'); }
+    } catch (e) { showToast('Erro de ligacao.', 'error'); }
+  }
+  async function progRemoverHode(id) {
+    try {
+      await fetch(SUPABASE_URL + '/rest/v1/prog_hodes?id=eq.' + id, { method: 'DELETE', headers: progHeaders() });
+      loadProg();
+    } catch (e) { showToast('Erro de ligacao.', 'error'); }
+  }
+
+  async function progInscrever(grupoId, posicao) {
+    const myPhone = progMyPhone();
+    if (!myPhone) { showToast('Falta o teu numero no perfil.', 'error'); return; }
+    try {
+      const res = await fetch(SUPABASE_URL + '/rest/v1/prog_participantes', {
+        method: 'POST',
+        headers: Object.assign(progHeaders(), { 'Prefer': 'return=minimal' }),
+        body: JSON.stringify({ grupo_id: grupoId, posicao: posicao, phone: myPhone, nome: userName || 'Participante', estado: 'pendente' })
+      });
+      if (res.ok) { showToast('\u2713 Inscricao enviada!', 'success'); loadProg(); }
+      else { const t = await res.text(); showToast(t.indexOf('duplicate') >= 0 ? 'Posicao ja ocupada.' : 'Erro ao inscrever.', 'error'); loadProg(); }
+    } catch (e) { showToast('Erro de ligacao.', 'error'); }
+  }
+
+  async function progAceitar(id) {
+    try {
+      const res = await fetch(SUPABASE_URL + '/rest/v1/rpc/prog_aceitar_participante', {
+        method: 'POST', headers: progHeaders(), body: JSON.stringify({ p_id: id })
+      });
+      if (res.ok) { showToast('\u2713 Aceite. 20 creditos carregados.', 'success'); loadProg(); }
+      else { showToast('Erro ao aceitar.', 'error'); }
+    } catch (e) { showToast('Erro de ligacao.', 'error'); }
+  }
+
+  function showToast(msg, type = '') {
+    const t = document.getElementById('toast');
+    t.textContent = msg; t.className = `toast show ${type}`;
+    setTimeout(() => { t.className = 'toast'; }, 3000);
+  }
+
+  // Permitir Enter nos campos de auth
+  document.getElementById('loginPassword').addEventListener('keydown', e => { if (e.key === 'Enter') doLogin(); });
+  document.getElementById('regPassword').addEventListener('keydown', e => { if (e.key === 'Enter') doRegister(); });
+
+  init();
+</script>
 </body>
 </html>
