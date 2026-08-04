@@ -559,13 +559,14 @@
 </div>
 
 <div class="modal-overlay" id="progAdminModal" onclick="if(event.target===this)this.classList.remove('open')">
-  <div class="modal">
+  <div class="modal" style="max-height:88vh;overflow-y:auto">
     <div class="modal-handle"></div>
     <div class="modal-title" id="progAdminTitulo">Registar</div>
     <div class="prog-sub" id="progAdminSub" style="margin-bottom:12px"></div>
     <div class="section-label" style="margin:4px 0 6px">Prognosticos da lista</div>
-    <div id="progAdminProgs" style="max-height:200px;overflow-y:auto;margin-bottom:12px"></div>
-    <input class="place-input" id="progAdminValor" inputmode="decimal" placeholder="Valor">
+    <div id="progAdminProgs" style="max-height:130px;overflow-y:auto;margin-bottom:12px"></div>
+    <label class="section-label" style="display:block;margin:4px 0 6px" id="progAdminValorLbl">Valor</label>
+    <input class="place-input" id="progAdminValor" type="text" inputmode="decimal" placeholder="Ex: 12,50" autocomplete="off" onfocus="setTimeout(()=>this.scrollIntoView({block:'center'}),300)">
     <input type="file" id="progAdminFile" accept="image/*" style="display:none" onchange="progAdminFoto(event)">
     <button class="modal-btn" style="background:var(--mid);border:1px solid var(--border)" onclick="document.getElementById('progAdminFile').click()">Escolher foto</button>
     <div id="progAdminFotoPrev" style="display:none;margin-top:10px"><img id="progAdminImg" style="width:100%;border-radius:12px"></div>
@@ -2124,7 +2125,8 @@
       pv.innerHTML = hh || '<div class="prog-sub">Sem linhas.</div>';
     } catch (e) { pv.innerHTML = '<div class="prog-sub">Erro ao carregar.</div>'; }
     document.getElementById('progAdminValor').value = '';
-    document.getElementById('progAdminValor').placeholder = acao === 'registar' ? 'Valor do registo' : 'Valor dos ganhos';
+    document.getElementById('progAdminValor').placeholder = acao === 'registar' ? 'Ex: 12,50' : 'Ex: 40,00';
+    const vlbl = document.getElementById('progAdminValorLbl'); if (vlbl) vlbl.textContent = acao === 'registar' ? 'Valor do registo' : 'Valor dos ganhos (premio)';
     document.getElementById('progAdminFotoPrev').style.display = 'none';
     const b = document.getElementById('progAdminBtn'); b.disabled = true; b.style.opacity = '0.5';
     document.getElementById('progAdminBtn').textContent = acao === 'registar' ? 'Registar e retirar creditos' : 'Terminar e creditar';
