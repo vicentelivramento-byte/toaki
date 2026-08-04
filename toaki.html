@@ -559,14 +559,14 @@
 </div>
 
 <div class="modal-overlay" id="progAdminModal" onclick="if(event.target===this)this.classList.remove('open')">
-  <div class="modal" style="max-height:88vh;overflow-y:auto">
+  <div class="modal" style="max-height:90vh;overflow-y:auto;-webkit-overflow-scrolling:touch">
     <div class="modal-handle"></div>
     <div class="modal-title" id="progAdminTitulo">Registar</div>
     <div class="prog-sub" id="progAdminSub" style="margin-bottom:12px"></div>
     <div class="section-label" style="margin:4px 0 6px">Prognosticos da lista</div>
     <div id="progAdminProgs" style="max-height:130px;overflow-y:auto;margin-bottom:12px"></div>
     <label class="section-label" style="display:block;margin:4px 0 6px" id="progAdminValorLbl">Valor</label>
-    <input class="place-input" id="progAdminValor" type="text" inputmode="decimal" placeholder="Ex: 12,50" autocomplete="off" onfocus="setTimeout(()=>this.scrollIntoView({block:'center'}),300)">
+    <input class="place-input" id="progAdminValor" type="number" step="0.01" min="0" placeholder="Ex: 12.50" autocomplete="off">
     <input type="file" id="progAdminFile" accept="image/*" style="display:none" onchange="progAdminFoto(event)">
     <button class="modal-btn" style="background:var(--mid);border:1px solid var(--border)" onclick="document.getElementById('progAdminFile').click()">Escolher foto</button>
     <div id="progAdminFotoPrev" style="display:none;margin-top:10px"><img id="progAdminImg" style="width:100%;border-radius:12px"></div>
