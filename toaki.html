@@ -2220,9 +2220,38 @@
     alert('COMO PAGAR (MB WAY)\n\n' + MBWAY_INFO + '\n\nValor: 20\u20AC por posicao.\n\nIMPORTANTE: nas observacoes do pagamento escreve o teu nome: "' + nome + '"\n\nApos o pagamento, a administracao aceita a tua posicao.');
   }
 
+  function progContaCorrente() {
+    // saldo de cada lista (grupo) + saldo total
+    const grupos = (progGrupos || []).slice().sort((a,b) => Number(b.creditos||0) - Number(a.creditos||0));
+    let total = 0;
+    grupos.forEach(g => { total += Number(g.creditos || 0); });
+    let h = '<div class="prog-card prog-admin">';
+    h += '<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:4px">' +
+           '<div class="prog-card-title" style="margin:0">Conta corrente</div>' +
+           '<div class="prog-badge" style="margin:0"><div class="prog-badge-val">' + progFmt(total) + '\u20AC</div><div class="prog-badge-lbl">Saldo total</div></div>' +
+         '</div>';
+    if (!grupos.length) {
+      h += '<div class="prog-sub">Sem listas.</div>';
+    } else {
+      grupos.forEach(g => {
+        const saldo = Number(g.creditos || 0);
+        const cor = saldo < 0 ? 'var(--red)' : 'var(--text)';
+        h += '<div class="prog-pos" style="margin-top:8px">' +
+               '<div class="prog-pos-name">' + g.nome +
+                 (g.fechada ? ' <span style="font-size:10px;color:var(--muted)">(fechada)</span>' : '') +
+               '</div>' +
+               '<div class="prog-pos-tag" style="color:' + cor + ';font-family:\'Syne\',sans-serif;font-weight:800">' + progFmt(saldo) + '\u20AC</div>' +
+             '</div>';
+      });
+    }
+    h += '</div>';
+    return h;
+  }
+
   function progAdminPanel() {
     const pend = progParts.filter(p => p.estado === 'pendente');
-    let h = '<div class="prog-card prog-admin"><div class="prog-card-title">Intervalos de hode</div>';
+    let h = progContaCorrente();
+    h += '<div class="prog-card prog-admin"><div class="prog-card-title">Intervalos de hode</div>';
     if (!progHodes.length) h += '<div class="prog-sub">Sem intervalos. Cria o primeiro.</div>';
     progHodes.forEach(hd => {
       h += '<div class="prog-pos" style="margin-top:8px">' +
