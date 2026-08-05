@@ -1801,7 +1801,9 @@
              '<div class="prog-badge"><div class="prog-badge-val">' + progFmt(meusCreditos) + '\u20AC</div><div class="prog-badge-lbl">Os meus creditos</div></div>' +
            '</div>';
     }
-    const souDono = g.criado_por && normalizePhone(g.criado_por) === myPhone;
+    const p1 = progParts.find(x => x.grupo_id === grupoId && x.posicao === 1);
+    const souDono = (myId && p1 && p1.user_id === myId) || (g.criado_por && normalizePhone(g.criado_por) === myPhone);
+    const fechada = !!g.fechada;
     for (let i = 1; i <= 8; i++) {
       const p = ocupadas[i];
       if (p) {
@@ -1815,6 +1817,16 @@
           acao = '<button class="prog-btn-sm" style="background:' + (p.aberta ? 'var(--mid);border:1px solid var(--border)' : '#2ECC71') + '" onclick="progAbrirParticipacao(' + grupoId + ',' + i + ',' + (p.aberta ? 'false' : 'true') + ')">' + (p.aberta ? 'Fechar' : 'Abrir a outros') + '</button>';
         } else {
           acao = '<div class="prog-pos-tag">' + (p.estado === 'pendente' ? 'Pendente' : '') + '</div>';
+        }
+        // Lista fechada: mostrar a receber + marcar recebido (so' o proprio)
+        if (fechada && p.a_receber != null) {
+          if (p.recebido) {
+            acao = '<div class="prog-pos-tag" style="color:#2ECC71;font-weight:700">Recebido</div>';
+          } else if (eu) {
+            acao = '<button class="prog-btn-sm" style="background:#2ECC71" onclick="progMarcarRecebido(' + p.id + ')">Receber ' + progFmt(p.a_receber) + '\u20AC</button>';
+          } else {
+            acao = '<div class="prog-pos-tag">A receber ' + progFmt(p.a_receber) + '\u20AC</div>';
+          }
         }
         h += '<div class="prog-pos' + (eu ? ' minha' : '') + '">' +
                '<div class="prog-pos-num">' + i + '</div>' +
@@ -1838,10 +1850,44 @@
     if (minhasAqui.some(p => p.estado === 'aceite')) {
       h += '<button class="prog-btn" onclick="progAbrirPrognosticos(' + grupoId + ')">Prognosticos</button>';
     }
-    if (souDono && nOcup < 8) {
+    if (souDono && nOcup < 8 && !fechada) {
       h += '<button class="prog-btn" style="background:#25D366" onclick="progPartilhar(' + grupoId + ')">Convidar por WhatsApp</button>';
     }
+    if (souDono && !fechada) {
+      h += '<button class="prog-btn" style="background:transparent;border:1px solid var(--red);color:var(--red);margin-top:8px" onclick="progFecharLista(' + grupoId + ')">Fechar lista</button>';
+    }
+    if (fechada) {
+      h += '<div class="prog-sub" style="text-align:center;margin-top:10px;color:var(--muted)">Lista fechada \u2014 cada participante marca o que recebeu</div>';
+    }
     return h + '</div>';
+  }
+
+  async function progFecharLista(grupoId) {
+    const g = progGrupos.find(x => x.id === grupoId);
+    if (!g) return;
+    const nOcup = progParts.filter(p => p.grupo_id === grupoId && p.user_id).length;
+    const quota = nOcup > 0 ? Number(g.creditos || 0) / nOcup : 0;
+    if (!confirm('Fechar a lista "' + g.nome + '"?\n\nCada uma das ' + nOcup + ' posicoes ocupadas ficara com ' + progFmt(quota) + '\u20AC a receber. Esta acao nao pode ser revertida.')) return;
+    try {
+      const res = await fetch(SUPABASE_URL + '/rest/v1/rpc/prog_fechar_lista', {
+        method: 'POST', headers: progHeaders(),
+        body: JSON.stringify({ p_grupo: grupoId, p_user_id: currentUser?.id || null })
+      });
+      if (res.ok) { showToast('\u2713 Lista fechada.', 'success'); loadProg(); }
+      else { const t = await res.text(); showToast(t.includes('dono') ? 'So o dono pode fechar.' : 'Erro ao fechar.', 'error'); }
+    } catch (e) { showToast('Erro ao fechar.', 'error'); }
+  }
+
+  async function progMarcarRecebido(participanteId) {
+    if (!confirm('Confirmas que recebeste este valor?')) return;
+    try {
+      const res = await fetch(SUPABASE_URL + '/rest/v1/rpc/prog_marcar_recebido', {
+        method: 'POST', headers: progHeaders(),
+        body: JSON.stringify({ p_participante: participanteId, p_user_id: currentUser?.id || null })
+      });
+      if (res.ok) { showToast('\u2713 Marcado como recebido.', 'success'); loadProg(); }
+      else { const t = await res.text(); showToast(t.includes('proprio') ? 'So o proprio pode marcar.' : 'Erro.', 'error'); }
+    } catch (e) { showToast('Erro.', 'error'); }
   }
 
   function progPartilhar(grupoId) {
