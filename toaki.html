@@ -1672,6 +1672,15 @@
         ]);
         progProntas = Array.isArray(prt) ? prt : [];
         progRegistadas = Array.isArray(reg) ? reg : [];
+        // conta da casa (saldo + movimentos)
+        try {
+          const [casa, movs] = await Promise.all([
+            fetch(SUPABASE_URL + '/rest/v1/prog_casa?id=eq.1&select=saldo', { headers: progHeaders() }).then(r => r.json()).catch(() => []),
+            fetch(SUPABASE_URL + '/rest/v1/prog_casa_movimentos?select=*&order=created_at.desc&limit=100', { headers: progHeaders() }).then(r => r.json()).catch(() => [])
+          ]);
+          progCasaSaldo = (Array.isArray(casa) && casa[0]) ? Number(casa[0].saldo || 0) : 0;
+          progCasaMovs = Array.isArray(movs) ? movs : [];
+        } catch (e) { progCasaSaldo = 0; progCasaMovs = []; }
       }
       const myId = currentUser?.id || null;
       progMinhas = myId
@@ -1686,6 +1695,7 @@
   let progBuscaTxt = '';
   let progGrupoExpandido = null;
   let progBuscaAberta = false;
+  let progCasaSaldo = 0, progCasaMovs = [], progCCtab = 'listas';
   // configura aqui as instrucoes de pagamento MB WAY (numero/chave a preencher)
   const MBWAY_INFO = 'PREENCHER: numero MB WAY';
 
@@ -2267,31 +2277,64 @@
   }
 
   function progContaCorrente() {
-    // saldo de cada lista (grupo) + saldo total
-    const grupos = (progGrupos || []).slice().sort((a,b) => Number(b.creditos||0) - Number(a.creditos||0));
-    let total = 0;
-    grupos.forEach(g => { total += Number(g.creditos || 0); });
     let h = '<div class="prog-card prog-admin">';
-    h += '<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:4px">' +
-           '<div class="prog-card-title" style="margin:0">Conta corrente</div>' +
-           '<div class="prog-badge" style="margin:0"><div class="prog-badge-val">' + progFmt(total) + '\u20AC</div><div class="prog-badge-lbl">Saldo total</div></div>' +
+    h += '<div class="prog-card-title" style="margin-bottom:10px">Conta corrente</div>';
+    // separador
+    h += '<div style="display:flex;gap:6px;margin-bottom:12px">' +
+           '<button class="pg-btn' + (progCCtab==='listas'?' on':'') + '" style="flex:1" onclick="progCCtab=\'listas\';renderProg()">Listas</button>' +
+           '<button class="pg-btn' + (progCCtab==='casa'?' on':'') + '" style="flex:1" onclick="progCCtab=\'casa\';renderProg()">Ganhos da casa</button>' +
          '</div>';
-    if (!grupos.length) {
-      h += '<div class="prog-sub">Sem listas.</div>';
-    } else {
-      grupos.forEach(g => {
+    if (progCCtab === 'listas') {
+      const grupos = (progGrupos || []).slice().sort((a,b) => Number(b.creditos||0) - Number(a.creditos||0));
+      let total = 0; grupos.forEach(g => { total += Number(g.creditos || 0); });
+      h += '<div class="prog-badge" style="width:100%;margin-bottom:8px"><div class="prog-badge-val">' + progFmt(total) + '\u20AC</div><div class="prog-badge-lbl">Saldo total das listas</div></div>';
+      if (!grupos.length) h += '<div class="prog-sub">Sem listas.</div>';
+      else grupos.forEach(g => {
         const saldo = Number(g.creditos || 0);
         const cor = saldo < 0 ? 'var(--red)' : 'var(--text)';
         h += '<div class="prog-pos" style="margin-top:8px">' +
-               '<div class="prog-pos-name">' + g.nome +
-                 (g.fechada ? ' <span style="font-size:10px;color:var(--muted)">(fechada)</span>' : '') +
-               '</div>' +
+               '<div class="prog-pos-name">' + g.nome + (g.fechada ? ' <span style="font-size:10px;color:var(--muted)">(fechada)</span>' : '') + '</div>' +
                '<div class="prog-pos-tag" style="color:' + cor + ';font-family:\'Syne\',sans-serif;font-weight:800">' + progFmt(saldo) + '\u20AC</div>' +
+             '</div>';
+      });
+    } else {
+      // GANHOS DA CASA
+      h += '<div class="prog-badge" style="width:100%;margin-bottom:10px"><div class="prog-badge-val">' + progFmt(progCasaSaldo) + '\u20AC</div><div class="prog-badge-lbl">Saldo da casa (comissoes)</div></div>';
+      h += '<button class="prog-btn" onclick="progAbrirSaque()">Fazer saque</button>';
+      h += '<div class="section-label" style="margin:14px 0 6px">Movimentos</div>';
+      if (!progCasaMovs.length) h += '<div class="prog-sub">Sem movimentos.</div>';
+      else progCasaMovs.forEach(m => {
+        const v = Number(m.valor || 0);
+        const ent = v >= 0;
+        h += '<div class="prog-pos" style="margin-top:6px">' +
+               '<div class="prog-pos-name" style="font-size:13px">' + (m.descricao || (m.tipo==='comissao'?'Comissao':'Saque')) +
+                 '<div class="prog-sub">' + (m.created_at ? m.created_at.substring(0,10) : '') + '</div></div>' +
+               '<div class="prog-pos-tag" style="color:' + (ent?'#2ECC71':'var(--red)') + ';font-family:\'Syne\',sans-serif;font-weight:800">' + (ent?'+':'') + progFmt(v) + '\u20AC</div>' +
              '</div>';
       });
     }
     h += '</div>';
     return h;
+  }
+
+  function progAbrirSaque() {
+    const val = prompt('Valor a sacar (disponivel: ' + progFmt(progCasaSaldo) + '\u20AC):');
+    if (val == null) return;
+    const v = progNum(val);
+    if (!v || v <= 0) { showToast('Valor invalido.', 'error'); return; }
+    if (v > progCasaSaldo) { showToast('Saldo insuficiente.', 'error'); return; }
+    const desc = prompt('Descricao (opcional):') || 'Saque';
+    progFazerSaque(v, desc);
+  }
+  async function progFazerSaque(valor, desc) {
+    try {
+      const res = await fetch(SUPABASE_URL + '/rest/v1/rpc/prog_casa_saque', {
+        method: 'POST', headers: progHeaders(),
+        body: JSON.stringify({ p_valor: valor, p_descricao: desc, p_por: currentUser?.id || null })
+      });
+      if (res.ok) { showToast('\u2713 Saque registado.', 'success'); loadProg(); }
+      else { const t = await res.text(); showToast(t.includes('insuficiente') ? 'Saldo insuficiente.' : 'Erro no saque.', 'error'); }
+    } catch (e) { showToast('Erro no saque.', 'error'); }
   }
 
   function progAdminPanel() {
