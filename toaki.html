@@ -86,6 +86,13 @@
     #progScreen .prog-badge .prog-badge-val { color: #fff; }
     #progScreen .prog-badge .prog-badge-lbl { color: rgba(255,255,255,0.85); }
     #progScreen .prog-card-title { color: var(--green); }
+    #progScreen .prog-info { background: #fff; border: 1px solid rgba(0,0,0,0.10); border-radius: 14px; margin-bottom: 12px; overflow: hidden; }
+    #progScreen .prog-info-tabs { display: flex; }
+    #progScreen .prog-info-tab { flex: 1; padding: 13px 8px; background: #F0F2F0; border: none; color: #1A1A1A; font-family: 'Syne', sans-serif; font-weight: 700; font-size: 14px; cursor: pointer; }
+    #progScreen .prog-info-tab.on { background: var(--green); color: #fff; }
+    #progScreen .prog-info-body { padding: 16px; font-size: 15px; line-height: 1.55; color: #1A1A1A; }
+    #progScreen .prog-info-body p { margin-bottom: 10px; }
+    #progScreen .prog-info-body strong { color: var(--green); }
     .lp-ov { display: none; position: fixed; inset: 0; background: var(--dark); z-index: 700; overflow-y: auto; }
     .lp-ov.open { display: block; }
     .lp-head { position: sticky; top: 0; background: var(--dark); border-bottom: 1px solid var(--border); padding: 16px; display: flex; align-items: center; gap: 12px; z-index: 2; }
@@ -1746,6 +1753,7 @@
   let progGrupoExpandido = null;
   let progBuscaAberta = false;
   let progCasaSaldo = 0, progCasaMovs = [], progCCtab = 'listas';
+  let progInfoAberto = '';
   // configura aqui as instrucoes de pagamento MB WAY (numero/chave a preencher)
   const MBWAY_INFO = 'Numero MB WAY: 963 972 914';
 
@@ -1761,10 +1769,39 @@
     return parseFloat(String(txt || '').trim().replace(',', '.'));
   }
 
+  function progToggleInfo(qual) {
+    progInfoAberto = (progInfoAberto === qual) ? '' : qual;
+    renderProg();
+  }
+  function progInfoSeccao() {
+    const conceito =
+      '<p><strong>O que e o O MEU PROGNOSTICO?</strong></p>' +
+      '<p>E uma forma de jogares em grupo os teus palpites desportivos. Juntas-te a uma lista com outras pessoas, cada uma ocupa uma posicao, e todos partilham o mesmo boletim de prognosticos.</p>' +
+      '<p>Cada lista tem <strong>8 posicoes</strong>. Podes ocupar uma ou varias, na mesma lista ou em listas diferentes. Cada posicao aceite conta para o grupo.</p>' +
+      '<p>No fim, os ganhos sao repartidos por quem participou. E mais barato e mais divertido do que jogar sozinho.</p>';
+    const comojogar =
+      '<p><strong>1. Entra numa lista</strong><br>Cria a tua propria lista ou junta-te a uma existente atraves do link de convite. Escolhe uma posicao livre.</p>' +
+      '<p><strong>2. Paga a tua posicao</strong><br>Cada posicao custa 20\u20AC, por MB WAY. Toca em "Como pagar" e segue as instrucoes. A administracao aceita a tua posicao apos o pagamento.</p>' +
+      '<p><strong>3. Preenche os prognosticos</strong><br>Para cada jogo, escolhe o <strong>tipo</strong> (TR, INT, DV ou +/-) e o <strong>prognostico</strong> (1, X, 2 ou +/-). Guarda cada linha.</p>' +
+      '<p><strong>4. Acompanha os resultados</strong><br>Quando a aposta e registada e os resultados saem, os ganhos entram na lista. Ao fechar, cada participante recebe a sua parte.</p>';
+    let body = '';
+    if (progInfoAberto === 'conceito') body = '<div class="prog-info-body">' + conceito + '</div>';
+    else if (progInfoAberto === 'comojogar') body = '<div class="prog-info-body">' + comojogar + '</div>';
+    return '<div class="prog-info">' +
+             '<div class="prog-info-tabs">' +
+               '<button class="prog-info-tab' + (progInfoAberto==='conceito'?' on':'') + '" onclick="progToggleInfo(\'conceito\')">Conceito</button>' +
+               '<button class="prog-info-tab' + (progInfoAberto==='comojogar'?' on':'') + '" onclick="progToggleInfo(\'comojogar\')">Como jogar</button>' +
+             '</div>' + body +
+           '</div>';
+  }
+
   function renderProg() {
     const bInput = document.getElementById('progBusca'); if (bInput) progBuscaTxt = bInput.value;
     const box = document.getElementById('progScreen');
     let html = '';
+
+    // ----- Seccao Conceito / Como jogar -----
+    html += progInfoSeccao();
 
     // Botao criar sempre visivel
     html += '<button class="prog-btn" onclick="progAbrirCriar()">+ Criar lista</button>';
