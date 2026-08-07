@@ -58,7 +58,28 @@
     .nav-tabs { display: flex; padding: 0 16px 0; gap: 0; border-bottom: 1px solid var(--border); background: var(--dark); }
     .nav-tab { flex: 1; padding: 12px 8px; text-align: center; font-family: 'Syne', sans-serif; font-size: 13px; font-weight: 600; color: var(--muted); border: none; background: transparent; cursor: pointer; border-bottom: 2px solid transparent; transition: all 0.2s; margin-bottom: -1px; }
     .nav-tab.active { color: var(--text); border-bottom-color: var(--red); }
-    #progScreen { display: none; flex-direction: column; padding: 16px; gap: 12px; }
+    #progScreen {
+      display: none; flex-direction: column; padding: 16px; gap: 12px;
+      /* Tema TerminalGest / JSCL: verde, branco, vermelho, fundo claro */
+      --red: #C8102E;            /* vermelho JSCL */
+      --green: #009639;          /* verde JSCL */
+      --dark: #F4F6F4;           /* fundo geral claro */
+      --mid: #FFFFFF;            /* superficies */
+      --surface: #FFFFFF;
+      --border: rgba(0,0,0,0.10);
+      --text: #1A1A1A;
+      --muted: #6B7280;
+      background: var(--dark);
+      color: var(--text);
+      border-radius: 0;
+    }
+    #progScreen .prog-card, #progScreen .modal { box-shadow: 0 1px 3px rgba(0,0,0,0.06); }
+    #progScreen .place-input, #progScreen .prog-in { background: #FFFFFF; border: 1px solid rgba(0,0,0,0.15); color: #1A1A1A; }
+    #progScreen .section-label { color: var(--green); }
+    #progScreen .pg-btn { background: #F0F2F0; border: 1px solid rgba(0,0,0,0.12); color: #1A1A1A; }
+    #progScreen .pg-btn.on { background: var(--green); border-color: var(--green); color: #fff; }
+    #progScreen .prog-badge { background: var(--green); }
+    #progScreen .prog-card-title { color: var(--green); }
     .lp-ov { display: none; position: fixed; inset: 0; background: var(--dark); z-index: 700; overflow-y: auto; }
     .lp-ov.open { display: block; }
     .lp-head { position: sticky; top: 0; background: var(--dark); border-bottom: 1px solid var(--border); padding: 16px; display: flex; align-items: center; gap: 12px; z-index: 2; }
@@ -555,6 +576,18 @@
     <div class="prog-sub" id="lpSub" style="margin-bottom:14px"></div>
     <div id="lpBody"></div>
     <button class="lp-copy" onclick="copiarListaPronta()">Copiar lista (texto)</button>
+  </div>
+</div>
+
+<div class="modal-overlay" id="progCriarModal" onclick="if(event.target===this)this.classList.remove('open')">
+  <div class="modal" style="max-height:88vh;overflow-y:auto">
+    <div class="modal-title">Nova lista</div>
+    <label class="section-label" style="display:block;margin:8px 0 6px">Nome da lista</label>
+    <input class="place-input" id="progCriarNome" placeholder="Ex: Jornada 5" autocomplete="off">
+    <label class="section-label" style="display:block;margin:14px 0 6px">Intervalo de hode</label>
+    <div id="progCriarHodes"></div>
+    <button class="prog-btn" style="margin-top:14px" onclick="progConfirmarCriar()">Criar lista</button>
+    <button class="prog-btn" style="background:transparent;border:1px solid var(--border);color:var(--text);margin-top:8px" onclick="document.getElementById('progCriarModal').classList.remove('open')">Cancelar</button>
   </div>
 </div>
 
@@ -1697,7 +1730,7 @@
   let progBuscaAberta = false;
   let progCasaSaldo = 0, progCasaMovs = [], progCCtab = 'listas';
   // configura aqui as instrucoes de pagamento MB WAY (numero/chave a preencher)
-  const MBWAY_INFO = 'PREENCHER: numero MB WAY';
+  const MBWAY_INFO = 'Numero MB WAY: 963 972 914';
 
   // Formata valores: 20 -> "20" | 1.5 -> "1,5" | 2.25 -> "2,25"
   function progFmt(v) {
@@ -2012,10 +2045,10 @@
 
       if (expandida) {
         html += '<div class="prog-edit" onclick="event.stopPropagation()">' +
-          '<input class="prog-in" id="pc_' + i + '" placeholder="Codigo do jogo" value="' + (row.codigo_jogo || '') + '">' +
+          '<input class="prog-in" id="pc_' + i + '" placeholder="Codigo do jogo" oninput="progCodigo[' + i + ']=this.value" value="' + (progCodigo[i] != null ? progCodigo[i] : (row.codigo_jogo || '')) + '">' +
           progBotoesPrognostico(i, row.prognostico || '') +
           '<div class="prog-in-row">' +
-            '<input class="prog-in" id="pv_' + i + '" inputmode="decimal" placeholder="Valor" value="' + (row.valor != null ? progFmt(row.valor) : '') + '">' +
+            '<input class="prog-in" id="pv_' + i + '" inputmode="decimal" placeholder="Valor" oninput="progValor[' + i + ']=this.value" value="' + (progValor[i] != null ? progValor[i] : (row.valor != null ? progFmt(row.valor) : '')) + '">' +
             '<button class="prog-btn-sm" style="height:42px;padding:0 18px" onclick="progGuardarLinha(' + i + ')">Guardar</button>' +
           '</div>' +
         '</div>';
@@ -2027,6 +2060,7 @@
 
   // Estado da escolha de prognostico por posicao: {tipo, valor}
   let progEscolha = {};
+  let progCodigo = {}, progValor = {};
   function progParsePrognostico(txt) {
     // aceita "TR 1", "INT X", "DV 2", "+/- +", "+/- -"
     const t = (txt || '').trim().toUpperCase();
@@ -2058,15 +2092,20 @@
     }
     return h;
   }
+  function progCapturarInputs(i) {
+    const pc = document.getElementById('pc_' + i); if (pc) progCodigo[i] = pc.value;
+    const pv = document.getElementById('pv_' + i); if (pv) progValor[i] = pv.value;
+  }
   function progEscolherTipo(i, tp) {
+    progCapturarInputs(i);
     const e = progEscolha[i] || { tipo: '', valor: '' };
-    if (e.tipo !== tp) { e.tipo = tp; e.valor = ''; }  // muda tipo -> limpa valor
+    if (e.tipo !== tp) { e.tipo = tp; e.valor = ''; }
     progEscolha[i] = e;
-    progRenderDia();
-    progLinhaAberta = i;  // manter aberta
+    progLinhaAberta = i;
     progRenderDia();
   }
   function progEscolherValor(i, v) {
+    progCapturarInputs(i);
     const e = progEscolha[i] || { tipo: '', valor: '' };
     e.valor = v; progEscolha[i] = e;
     progLinhaAberta = i;
@@ -2081,6 +2120,7 @@
   async function progGuardarLinha(posicao) {
     const codigo = document.getElementById('pc_' + posicao).value.trim();
     const prog = progPrognosticoTexto(posicao);
+    progCodigo[posicao] = codigo;
     const valTxt = document.getElementById('pv_' + posicao).value.trim();
     if (!codigo) { alert('Falta o codigo do jogo.'); return; }
     if (!prog) { alert('Escolhe o tipo e o prognostico (ex: TR + 1).'); return; }
@@ -2408,15 +2448,31 @@
     return h + '</div>';
   }
 
+  let progCriarHodeSel = null;
   function progAbrirCriar() {
     if (!progHodes.length) { showToast('Ainda nao ha intervalos de hode definidos.', 'error'); return; }
-    const opts = progHodes.map(h => progFmt(h.min_val) + '-' + progFmt(h.max_val) + ' EUR').join('\n');
-    const nome = prompt('Nome da lista:');
-    if (nome === null || !nome.trim()) return;
-    let idx = prompt('Escolhe o intervalo de hode (escreve o numero):\n\n' + progHodes.map((h,i) => (i+1) + ') ' + progFmt(h.min_val) + '-' + progFmt(h.max_val) + ' EUR').join('\n'));
-    idx = parseInt(idx, 10);
-    if (!idx || idx < 1 || idx > progHodes.length) { showToast('Intervalo invalido.', 'error'); return; }
-    progCriarGrupo(nome.trim(), progHodes[idx-1].id);
+    progCriarHodeSel = null;
+    document.getElementById('progCriarNome').value = '';
+    progRenderHodesCriar();
+    document.getElementById('progCriarModal').classList.add('open');
+  }
+  function progRenderHodesCriar() {
+    let h = '';
+    progHodes.forEach(hd => {
+      const sel = progCriarHodeSel === hd.id;
+      h += '<div onclick="progCriarHodeSel=' + hd.id + ';progRenderHodesCriar()" style="display:flex;align-items:center;justify-content:space-between;padding:14px;margin-bottom:8px;border-radius:12px;cursor:pointer;border:2px solid ' + (sel ? 'var(--red)' : 'var(--border)') + ';background:' + (sel ? 'rgba(232,57,42,0.08)' : 'var(--surface)') + '">' +
+             '<div style="font-family:\'Syne\',sans-serif;font-weight:700;font-size:15px">' + progFmt(hd.min_val) + ' \u2013 ' + progFmt(hd.max_val) + '\u20AC</div>' +
+             (sel ? '<div style="color:var(--red);font-weight:800">\u2713</div>' : '') +
+           '</div>';
+    });
+    document.getElementById('progCriarHodes').innerHTML = h;
+  }
+  function progConfirmarCriar() {
+    const nome = document.getElementById('progCriarNome').value.trim();
+    if (!nome) { showToast('Escreve o nome da lista.', 'error'); return; }
+    if (!progCriarHodeSel) { showToast('Escolhe o intervalo de hode.', 'error'); return; }
+    document.getElementById('progCriarModal').classList.remove('open');
+    progCriarGrupo(nome, progCriarHodeSel);
   }
   async function progCriarGrupo(nome, hodeId) {
     const myPhone = progMyPhone();
