@@ -79,6 +79,8 @@
     #progScreen .pg-btn { background: #F0F2F0; border: 1px solid rgba(0,0,0,0.12); color: #1A1A1A; }
     #progScreen .pg-btn.on { background: var(--green); border-color: var(--green); color: #fff; }
     #progScreen .prog-badge { background: var(--green); }
+    #progScreen .prog-badge .prog-badge-val { color: #fff; }
+    #progScreen .prog-badge .prog-badge-lbl { color: rgba(255,255,255,0.85); }
     #progScreen .prog-card-title { color: var(--green); }
     .lp-ov { display: none; position: fixed; inset: 0; background: var(--dark); z-index: 700; overflow-y: auto; }
     .lp-ov.open { display: block; }
@@ -110,6 +112,17 @@
     .prog-btn-sm { padding: 8px 14px; background: var(--red); border: none; border-radius: 10px; color: #fff; font-family: 'Syne', sans-serif; font-size: 12px; font-weight: 700; cursor: pointer; }
     .prog-admin { border-color: rgba(46,204,113,0.3); background: rgba(46,204,113,0.05); }
     .prog-empty { text-align: center; padding: 40px 20px; color: var(--muted); font-size: 13px; }
+    .prog-ov, .lp-ov {
+      --red: #C8102E; --green: #009639; --dark: #F4F6F4; --mid: #FFFFFF;
+      --surface: #FFFFFF; --border: rgba(0,0,0,0.10); --text: #1A1A1A; --muted: #6B7280;
+    }
+    .prog-ov .place-input, .prog-ov .prog-in, .lp-ov .place-input, .lp-ov .prog-in { background:#fff; border:1px solid rgba(0,0,0,0.15); color:#1A1A1A; }
+    .prog-ov .section-label, .lp-ov .section-label { color: var(--green); }
+    .prog-ov .pg-btn { background:#F0F2F0; border:1px solid rgba(0,0,0,0.12); color:#1A1A1A; }
+    .prog-ov .pg-btn.on { background:var(--green); border-color:var(--green); color:#fff; }
+    .prog-ov .prog-badge, .lp-ov .prog-badge { background: var(--green); }
+    .prog-ov .prog-badge-val, .lp-ov .prog-badge-val { color:#fff; }
+    .prog-ov .prog-badge-lbl, .lp-ov .prog-badge-lbl { color:rgba(255,255,255,0.85); }
     .prog-ov { display: none; position: fixed; inset: 0; background: var(--dark); z-index: 600; overflow-y: auto; }
     .prog-ov.open { display: block; }
     .prog-ov-head { position: sticky; top: 0; background: var(--dark); border-bottom: 1px solid var(--border); padding: 16px; display: flex; align-items: center; gap: 12px; z-index: 2; }
@@ -1985,7 +1998,9 @@
       const estado = infoRow ? infoRow.estado : 'aberta';
       const porHora = fecha ? (new Date(fecha) <= new Date()) : false;
       const porEstado = (estado === 'registada' || estado === 'terminada');
-      progListaFechada = porHora || porEstado;   // registada/terminada => nao editavel
+      const grupoObj = progGrupos.find(x => x.id === progListaGrupo);
+      const grupoFechado = !!(grupoObj && grupoObj.fechada);
+      progListaFechada = porHora || porEstado || grupoFechado;   // registada/terminada/grupo fechado => nao editavel
       const el = document.getElementById('progFechoInfo');
       if (porEstado) {
         el.textContent = estado === 'terminada' ? 'Lista terminada \u2014 nao editavel' : 'Lista registada \u2014 nao editavel';
