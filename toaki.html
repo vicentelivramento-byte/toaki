@@ -2536,8 +2536,8 @@
     progCriarGrupo(nome, progCriarHodeSel);
   }
   async function progCriarGrupo(nome, hodeId) {
-    const myPhone = progMyPhone();
-    if (!myPhone) { showToast('Falta o teu numero no perfil.', 'error'); return; }
+    let myPhone = progMyPhone();
+    if (!myPhone) { myPhone = await progGarantirTelefone(); if (!myPhone) return; }
     try {
       const res = await fetch(SUPABASE_URL + '/rest/v1/rpc/prog_criar_grupo', {
         method: 'POST', headers: progHeaders(),
@@ -2567,9 +2567,34 @@
     } catch (e) { showToast('Erro de ligacao.', 'error'); }
   }
 
+  async function progGarantirTelefone() {
+    let tel = progMyPhone();
+    if (tel) return tel;
+    const input = prompt('Para te inscreveres, precisamos do teu numero de telemovel (para o MB WAY e identificacao):');
+    if (input === null) return '';
+    tel = normalizePhone(input);
+    if (!tel || tel.length < 9) { showToast('Numero invalido.', 'error'); return ''; }
+    // guardar no perfil (profiles) e no metadata/local
+    try {
+      // verificar duplicado
+      const chk = await fetch(SUPABASE_URL + '/rest/v1/profiles?phone=eq.' + encodeURIComponent(tel) + '&select=id', { headers: progHeaders() }).then(r => r.json()).catch(() => []);
+      if (Array.isArray(chk) && chk.length && chk[0].id !== currentUser?.id) {
+        showToast('Este numero ja esta associado a outra conta.', 'error'); return '';
+      }
+      await fetch(SUPABASE_URL + '/rest/v1/profiles?id=eq.' + currentUser.id, {
+        method: 'PATCH', headers: Object.assign(progHeaders(), { 'Prefer': 'return=minimal' }),
+        body: JSON.stringify({ phone: tel })
+      });
+      localStorage.setItem('toaki_phone', tel);
+      if (currentUser.user_metadata) currentUser.user_metadata.phone = tel;
+      showToast('\u2713 Numero guardado no perfil.', 'success');
+    } catch (e) { /* mesmo que o guardar falhe, seguimos com o numero desta vez */ }
+    return tel;
+  }
+
   async function progInscrever(grupoId, posicao) {
-    const myPhone = progMyPhone();
-    if (!myPhone) { showToast('Falta o teu numero no perfil.', 'error'); return; }
+    const myPhone = await progGarantirTelefone();
+    if (!myPhone) return;
     try {
       const res = await fetch(SUPABASE_URL + '/rest/v1/prog_participantes', {
         method: 'POST',
