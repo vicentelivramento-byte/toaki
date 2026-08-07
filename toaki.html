@@ -2497,7 +2497,10 @@
         h += '<div class="prog-pos" style="margin-top:10px">' +
                '<div class="prog-pos-num">' + p.posicao + '</div>' +
                '<div class="prog-pos-name">' + p.nome + '<div class="prog-sub">' + (g ? g.nome : '') + ' &middot; ' + p.phone + '</div></div>' +
-               '<button class="prog-btn-sm" onclick="progAceitar(' + p.id + ')">Aceitar</button>' +
+               '<div style="display:flex;gap:6px">' +
+                 '<button class="prog-btn-sm" style="background:transparent;border:1px solid var(--red);color:var(--red)" onclick="progCancelarInscricao(' + p.id + ',\'' + (p.nome||'').replace(/'/g,"") + '\')">Cancelar</button>' +
+                 '<button class="prog-btn-sm" onclick="progAceitar(' + p.id + ')">Aceitar</button>' +
+               '</div>' +
              '</div>';
       });
     }
@@ -2573,6 +2576,18 @@
       });
       if (res.ok) { showToast('\u2713 Inscricao enviada!', 'success'); loadProg(); }
       else { const t = await res.text(); showToast(t.indexOf('duplicate') >= 0 ? 'Posicao ja ocupada.' : 'Erro ao inscrever.', 'error'); loadProg(); }
+    } catch (e) { showToast('Erro de ligacao.', 'error'); }
+  }
+
+  async function progCancelarInscricao(id, nome) {
+    if (!confirm('Cancelar a inscricao pendente de "' + (nome || 'participante') + '"?\n\nA posicao fica livre novamente.')) return;
+    try {
+      // so' apaga se ainda estiver pendente (seguranca: nao apaga aceites)
+      const res = await fetch(SUPABASE_URL + '/rest/v1/prog_participantes?id=eq.' + id + '&estado=eq.pendente', {
+        method: 'DELETE', headers: progHeaders()
+      });
+      if (res.ok) { showToast('\u2713 Inscricao cancelada.', 'success'); loadProg(); }
+      else { showToast('Erro ao cancelar.', 'error'); }
     } catch (e) { showToast('Erro de ligacao.', 'error'); }
   }
 
