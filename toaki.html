@@ -1702,6 +1702,7 @@
   let progIsAdmin = false, progGrupos = [], progParts = [], progMinhas = [], progHodes = [], progProntas = [], progRegistadas = [];
 
   function progHeaders() { return { 'apikey': SUPABASE_KEY, 'Content-Type': 'application/json' }; }
+  function progNumPos(g) { return (g && g.posicoes) ? Number(g.posicoes) : 8; }
   function progMyPhone() {
     return normalizePhone(currentUser?.user_metadata?.phone || localStorage.getItem('toaki_phone') || '');
   }
@@ -1779,7 +1780,7 @@
     const conceito =
       '<p><strong>O que e o O MEU PROGNOSTICO?</strong></p>' +
       '<p>E uma forma de jogares em grupo os teus palpites desportivos. Juntas-te a uma lista com outras pessoas, cada uma ocupa uma posicao, e todos partilham o mesmo boletim de prognosticos.</p>' +
-      '<p>Cada lista tem <strong>8 posicoes</strong>. Podes ocupar uma ou varias, na mesma lista ou em listas diferentes. Cada posicao aceite conta para o grupo.</p>' +
+      '<p>Cada lista tem um numero de <strong>posicoes</strong> (definido pela cota). Podes ocupar uma ou varias, na mesma lista ou em listas diferentes. Cada posicao aceite conta para o grupo.</p>' +
       '<p>No fim, os ganhos sao repartidos por quem participou. E mais barato e mais divertido do que jogar sozinho.</p>';
     const comojogar =
       '<p><strong>1. Entra numa lista</strong><br>Cria a tua propria lista ou junta-te a uma existente atraves do link de convite. Escolhe uma posicao livre.</p>' +
@@ -1839,7 +1840,7 @@
       const termo = (progBuscaTxt || '').trim().toLowerCase();
       const disponiveis = progGrupos.filter(g => {
         const ocup = progParts.filter(p => p.grupo_id === g.id).length;
-        const completa = ocup >= 8;                       // listas cheias nunca aparecem
+        const completa = ocup >= progNumPos(g);            // listas cheias nunca aparecem
         const jaEstou = meusGrupos.indexOf(g.id) >= 0;
         const bateNome = !termo || (g.nome || '').toLowerCase().indexOf(termo) >= 0;
         return !completa && !jaEstou && bateNome;
@@ -1855,7 +1856,7 @@
                     '<div style="display:flex;align-items:center;gap:10px">' +
                       '<div style="flex:1">' +
                         '<div class="prog-card-title" style="font-size:14px;margin-bottom:2px">' + g.nome + '</div>' +
-                        '<div class="prog-sub">' + (8 - ocup) + ' posicoes livres' + hodeTxt + '</div>' +
+                        '<div class="prog-sub">' + (progNumPos(g) - ocup) + ' posicoes livres' + hodeTxt + '</div>' +
                       '</div>' +
                       '<div class="prog-pos-tag" style="color:var(--red)">Ver</div>' +
                     '</div>' +
@@ -1892,7 +1893,7 @@
     const hodeTxt = (g.hode_min != null) ? (' &middot; cota ' + progFmt(g.hode_min) + '\u2013' + progFmt(g.hode_max) + '\u20AC') : '';
     const nOcup = Object.keys(ocupadas).length;
     let h = '<div class="prog-card"><div class="prog-card-title">' + g.nome + '</div>' +
-            '<div class="prog-sub">' + nOcup + '/8 posicoes &middot; ' + progFmt(g.creditos) + ' creditos' + hodeTxt + '</div>';
+            '<div class="prog-sub">' + nOcup + '/' + progNumPos(g) + ' posicoes &middot; ' + progFmt(g.creditos) + ' creditos' + hodeTxt + '</div>';
     if (minhasAqui.length) {
       const meusCreditos = quota * minhasAqui.length;
       h += '<div class="prog-badges">' +
@@ -1903,7 +1904,8 @@
     const p1 = progParts.find(x => x.grupo_id === grupoId && x.posicao === 1);
     const souDono = (myId && p1 && p1.user_id === myId) || (g.criado_por && normalizePhone(g.criado_por) === myPhone);
     const fechada = !!g.fechada;
-    for (let i = 1; i <= 8; i++) {
+    const NP = progNumPos(g);
+    for (let i = 1; i <= NP; i++) {
       const p = ocupadas[i];
       if (p) {
         const eu = (myId && p.user_id === myId);
@@ -1949,7 +1951,7 @@
     if (minhasAqui.some(p => p.estado === 'aceite')) {
       h += '<button class="prog-btn" onclick="progAbrirPrognosticos(' + grupoId + ')">Prognosticos</button>';
     }
-    if (souDono && nOcup < 8 && !fechada) {
+    if (souDono && nOcup < NP && !fechada) {
       h += '<button class="prog-btn" style="background:#25D366" onclick="progPartilhar(' + grupoId + ')">Convidar por WhatsApp</button>';
     }
     if (souDono && !fechada) {
@@ -1995,7 +1997,7 @@
     const ocup = progParts.filter(p => p.grupo_id === grupoId).length;
     const url = BASE_URL + 'toaki.html?lista=' + grupoId;
     const txt = 'Junta-te à minha lista "' + g.nome + '" no TÔAKI \u2014 O MEU PROGNÓSTICO.\n\n' +
-                'Posições livres: ' + (8 - ocup) + '/8\n' +
+                'Posições livres: ' + (progNumPos(g) - ocup) + '/' + progNumPos(g) + '\n' +
                 'Valor da cota: ' + progFmt(g.hode_min) + '\u2013' + progFmt(g.hode_max) + '\u20AC\n\n' +
                 'Escolhe a tua posição aqui: ' + url;
     window.open('https://wa.me/?text=' + encodeURIComponent(txt), '_blank');
@@ -2068,8 +2070,10 @@
   function progRenderDia() {
     const myPhone = progMyPhone();
     const souAceite = progParts.some(p => p.grupo_id === progListaGrupo && normalizePhone(p.phone) === myPhone && p.estado === 'aceite');
+    const gDia = progGrupos.find(x => x.id === progListaGrupo);
+    const NPdia = progNumPos(gDia);
     let html = '';
-    for (let i = 1; i <= 8; i++) {
+    for (let i = 1; i <= NPdia; i++) {  // nº de jogos = nº de posicoes da lista
       const row = progListaRows.find(r => r.posicao === i) || { posicao: i };
       const part = progParts.find(p => p.grupo_id === progListaGrupo && p.posicao === i && p.estado === 'aceite');
       const euDono = part && normalizePhone(part.phone) === myPhone;
@@ -2214,9 +2218,13 @@
   }
 
 
+  let progNotifEnviadas = {};
   async function progNotificarProgresso() {
     try {
       const grupoId = progListaGrupo, listaId = progListaId;
+      // uma notificacao por sessao por lista (data)
+      if (progNotifEnviadas[listaId]) return;
+      progNotifEnviadas[listaId] = true;
       const g = progGrupos.find(x => x.id === grupoId);
       if (!g) return;
       // participantes aceites deste grupo (posicoes ocupadas)
@@ -2498,13 +2506,14 @@
     if (!progHodes.length) h += '<div class="prog-sub">Sem intervalos. Cria o primeiro.</div>';
     progHodes.forEach(hd => {
       h += '<div class="prog-pos" style="margin-top:8px">' +
-             '<div class="prog-pos-name">' + progFmt(hd.min_val) + '\u2013' + progFmt(hd.max_val) + '\u20AC</div>' +
+             '<div class="prog-pos-name">' + progFmt(hd.min_val) + '\u2013' + progFmt(hd.max_val) + '\u20AC <span style="font-size:11px;color:var(--muted)">\u00B7 ' + (hd.posicoes || 8) + ' posicoes</span></div>' +
              '<div class="place-del" onclick="progRemoverHode(' + hd.id + ')">\u00D7</div>' +
            '</div>';
     });
     h += '<div style="display:flex;gap:8px;margin-top:10px">' +
            '<input class="place-input" id="hodeMin" type="text" inputmode="decimal" placeholder="Min" style="margin-bottom:0">' +
            '<input class="place-input" id="hodeMax" type="text" inputmode="decimal" placeholder="Max" style="margin-bottom:0">' +
+           '<input class="place-input" id="hodePos" type="number" min="2" max="20" placeholder="Pos" value="8" style="margin-bottom:0;max-width:70px">' +
            '<button class="prog-btn-sm" onclick="progAddHode()">Add</button>' +
          '</div>';
     h += '</div>';
@@ -2606,11 +2615,12 @@
   async function progAddHode() {
     const mn = progNum(document.getElementById('hodeMin').value);
     const mx = progNum(document.getElementById('hodeMax').value);
+    const pos = parseInt((document.getElementById('hodePos') || {}).value, 10) || 8;
     if (isNaN(mn) || isNaN(mx) || mx < mn) { showToast('Intervalo invalido.', 'error'); return; }
     try {
       const res = await fetch(SUPABASE_URL + '/rest/v1/prog_hodes', {
         method: 'POST', headers: Object.assign(progHeaders(), { 'Prefer': 'return=minimal' }),
-        body: JSON.stringify({ min_val: mn, max_val: mx })
+        body: JSON.stringify({ min_val: mn, max_val: mx, posicoes: pos })
       });
       if (res.ok) { showToast('\u2713 Intervalo criado.', 'success'); loadProg(); }
       else { showToast('Erro ao criar intervalo.', 'error'); }
