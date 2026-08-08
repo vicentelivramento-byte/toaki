@@ -610,7 +610,7 @@
     <div class="modal-title">Nova lista</div>
     <label class="section-label" style="display:block;margin:8px 0 6px">Nome da lista</label>
     <input class="place-input" id="progCriarNome" placeholder="Ex: Jornada 5" autocomplete="off">
-    <label class="section-label" style="display:block;margin:14px 0 6px">Intervalo de hode</label>
+    <label class="section-label" style="display:block;margin:14px 0 6px">Intervalo de cota</label>
     <div id="progCriarHodes"></div>
     <button class="prog-btn" style="margin-top:14px" onclick="progConfirmarCriar()">Criar lista</button>
     <button class="prog-btn" style="background:transparent;border:1px solid var(--border);color:var(--text);margin-top:8px" onclick="document.getElementById('progCriarModal').classList.remove('open')">Cancelar</button>
@@ -1850,7 +1850,7 @@
         disponiveis.forEach(g => {
           if (progGrupoExpandido === g.id) { html += progGrupoCard(g.id, true); return; }
           const ocup = progParts.filter(p => p.grupo_id === g.id).length;
-          const hodeTxt = (g.hode_min != null) ? (' \u00B7 hode ' + progFmt(g.hode_min) + '\u2013' + progFmt(g.hode_max) + '\u20AC') : '';
+          const hodeTxt = (g.hode_min != null) ? (' \u00B7 cota ' + progFmt(g.hode_min) + '\u2013' + progFmt(g.hode_max) + '\u20AC') : '';
           html += '<div class="prog-card" style="padding:12px;cursor:pointer" onclick="progToggleGrupo(' + g.id + ')">' +
                     '<div style="display:flex;align-items:center;gap:10px">' +
                       '<div style="flex:1">' +
@@ -1889,7 +1889,7 @@
     const minhasAqui = progMinhas.filter(p => p.grupo_id === grupoId);
     const nOcupadas = Object.keys(ocupadas).length;
     const quota = nOcupadas > 0 ? Number(g.creditos || 0) / nOcupadas : 0;
-    const hodeTxt = (g.hode_min != null) ? (' &middot; hode ' + progFmt(g.hode_min) + '\u2013' + progFmt(g.hode_max) + '\u20AC') : '';
+    const hodeTxt = (g.hode_min != null) ? (' &middot; cota ' + progFmt(g.hode_min) + '\u2013' + progFmt(g.hode_max) + '\u20AC') : '';
     const nOcup = Object.keys(ocupadas).length;
     let h = '<div class="prog-card"><div class="prog-card-title">' + g.nome + '</div>' +
             '<div class="prog-sub">' + nOcup + '/8 posicoes &middot; ' + progFmt(g.creditos) + ' creditos' + hodeTxt + '</div>';
@@ -1996,7 +1996,7 @@
     const url = BASE_URL + 'toaki.html?lista=' + grupoId;
     const txt = 'Junta-te à minha lista "' + g.nome + '" no TÔAKI \u2014 O MEU PROGNÓSTICO.\n\n' +
                 'Posições livres: ' + (8 - ocup) + '/8\n' +
-                'Valor da hode: ' + progFmt(g.hode_min) + '\u2013' + progFmt(g.hode_max) + '\u20AC\n\n' +
+                'Valor da cota: ' + progFmt(g.hode_min) + '\u2013' + progFmt(g.hode_max) + '\u20AC\n\n' +
                 'Escolhe a tua posição aqui: ' + url;
     window.open('https://wa.me/?text=' + encodeURIComponent(txt), '_blank');
   }
@@ -2201,7 +2201,11 @@
           p_prognostico: prog, p_valor: valor, p_phone: progMyPhone()
         })
       });
-      if (r.ok) { showToast('\u2713 Guardado.', 'success'); progLinhaAberta = null; progCarregarDia(); }
+      if (r.ok) {
+        showToast('\u2713 Guardado.', 'success'); progLinhaAberta = null;
+        progNotificarProgresso();  // avisar quem falta preencher
+        progCarregarDia();
+      }
       else {
         const d = await r.json().catch(() => ({}));
         alert(d.message || 'Erro ao guardar.');
@@ -2209,6 +2213,58 @@
     } catch (e) { showToast('Erro de ligacao.', 'error'); }
   }
 
+
+  async function progNotificarProgresso() {
+    try {
+      const grupoId = progListaGrupo, listaId = progListaId;
+      const g = progGrupos.find(x => x.id === grupoId);
+      if (!g) return;
+      // participantes aceites deste grupo (posicoes ocupadas)
+      const aceites = progParts.filter(p => p.grupo_id === grupoId && p.estado === 'aceite');
+      const totalPos = aceites.length;
+      if (!totalPos) return;
+
+      // quem ja preencheu ESTA lista (data): buscar prognosticos guardados desta lista
+      const rows = await fetch(SUPABASE_URL + '/rest/v1/prog_prognosticos?lista_id=eq.' + listaId + '&select=posicao,codigo_jogo,prognostico', { headers: progHeaders() }).then(r => r.json()).catch(() => []);
+      // posicoes "preenchidas" = as que tem pelo menos 1 prognostico com codigo
+      const preenchidas = new Set((rows || []).filter(x => x.codigo_jogo && x.prognostico).map(x => x.posicao));
+      const nPreenchidos = preenchidas.size;
+
+      // data e hora limite (texto)
+      const dataLista = (document.getElementById('progDataInput') || {}).value || '';
+      const infoRow = progListaRows.find(r => r.fecha_em) || null;
+      let limiteTxt = '21:00';
+      if (infoRow && infoRow.fecha_em) {
+        const d = new Date(infoRow.fecha_em);
+        limiteTxt = d.toLocaleDateString('pt-PT') + ' ' + d.toLocaleTimeString('pt-PT', { hour: '2-digit', minute: '2-digit' });
+      }
+      const viewUrl = BASE_URL + 'toaki.html?lista=' + grupoId;
+
+      // enviar a cada participante que AINDA NAO preencheu (e nao a mim)
+      const myId = currentUser?.id || null;
+      for (const p of aceites) {
+        if (preenchidas.has(p.posicao)) continue;      // ja preencheu
+        if (myId && p.user_id === myId) continue;       // nao a mim
+        if (!p.phone) continue;
+        await progEnviarPushProgresso(p.phone, g.nome, dataLista, nPreenchidos, totalPos, limiteTxt, viewUrl);
+      }
+    } catch (e) { /* silencioso: a notificacao nao deve bloquear o guardar */ }
+  }
+
+  async function progEnviarPushProgresso(phone, nomeLista, dataLista, nPreench, total, limiteTxt, viewUrl) {
+    try {
+      await fetch(SUPABASE_URL + '/functions/v1/swift-action', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'apikey': SUPABASE_KEY },
+        body: JSON.stringify({
+          phone,
+          title: 'Tens uma nova lista para ' + (dataLista || 'hoje'),
+          body: 'Preenchidos: ' + nPreench + '/' + total + '. Preenche o teu ate ' + limiteTxt + '.',
+          url: viewUrl
+        })
+      });
+    } catch (e) { /* silencioso */ }
+  }
 
   async function progAbrirParticipacao(grupoId, posicao, abrir) {
     try {
@@ -2438,7 +2494,7 @@
   function progAdminPanel() {
     const pend = progParts.filter(p => p.estado === 'pendente');
     let h = progContaCorrente();
-    h += '<div class="prog-card prog-admin"><div class="prog-card-title">Intervalos de hode</div>';
+    h += '<div class="prog-card prog-admin"><div class="prog-card-title">Intervalos de cota</div>';
     if (!progHodes.length) h += '<div class="prog-sub">Sem intervalos. Cria o primeiro.</div>';
     progHodes.forEach(hd => {
       h += '<div class="prog-pos" style="margin-top:8px">' +
@@ -2511,7 +2567,7 @@
 
   let progCriarHodeSel = null;
   function progAbrirCriar() {
-    if (!progHodes.length) { showToast('Ainda nao ha intervalos de hode definidos.', 'error'); return; }
+    if (!progHodes.length) { showToast('Ainda nao ha intervalos de cota definidos.', 'error'); return; }
     progCriarHodeSel = null;
     document.getElementById('progCriarNome').value = '';
     progRenderHodesCriar();
@@ -2531,7 +2587,7 @@
   function progConfirmarCriar() {
     const nome = document.getElementById('progCriarNome').value.trim();
     if (!nome) { showToast('Escreve o nome da lista.', 'error'); return; }
-    if (!progCriarHodeSel) { showToast('Escolhe o intervalo de hode.', 'error'); return; }
+    if (!progCriarHodeSel) { showToast('Escolhe o intervalo de cota.', 'error'); return; }
     document.getElementById('progCriarModal').classList.remove('open');
     progCriarGrupo(nome, progCriarHodeSel);
   }
