@@ -131,6 +131,14 @@
     .prog-ov .section-label, .lp-ov .section-label { color: var(--green); }
     .prog-ov .prog-cell-val, .lp-ov .prog-cell-val, .lp-ov .lp-cell-val { color: #0a5a2a; }
     #progScreen .prog-cell-val, #progScreen .lp-cell-val { color: #0a5a2a; }
+    .prog-row.res-certo { background: rgba(46,204,113,0.14) !important; border-color: rgba(46,204,113,0.5) !important; }
+    .prog-row.res-errado { background: rgba(200,16,46,0.10) !important; border-color: rgba(200,16,46,0.45) !important; }
+    .prog-res-btns { display: flex; gap: 8px; margin-top: 10px; }
+    .prog-res-btn { flex: 1; padding: 10px; border-radius: 10px; border: 1px solid var(--border); background: #fff; font-family: 'Syne',sans-serif; font-weight: 700; font-size: 13px; cursor: pointer; }
+    .prog-res-btn.certo { color: #1a7a3f; }
+    .prog-res-btn.certo.on { background: #2ECC71; color: #fff; border-color: #2ECC71; }
+    .prog-res-btn.errado { color: #C8102E; }
+    .prog-res-btn.errado.on { background: #C8102E; color: #fff; border-color: #C8102E; }
     .prog-ov .pg-btn { background:#F0F2F0; border:1px solid rgba(0,0,0,0.12); color:#1A1A1A; }
     .prog-ov .pg-btn.on { background:var(--green); border-color:var(--green); color:#fff; }
     .prog-ov .prog-badge, .lp-ov .prog-badge { background: var(--green); }
@@ -2004,7 +2012,7 @@
   }
 
   // ===== LISTAS DIARIAS DE PROGNOSTICOS =====
-  let progListaGrupo = null, progListaId = null, progListaRows = [], progListaFechada = false, progLinhaAberta = null;
+  let progListaGrupo = null, progListaId = null, progListaRows = [], progListaFechada = false, progLinhaAberta = null, progListaEstado = 'aberta';
 
   function progAbrirPrognosticos(grupoId) {
     progListaGrupo = grupoId;
@@ -2041,6 +2049,7 @@
       const infoRow = (Array.isArray(info) && info[0]) ? info[0] : null;
       const fecha = infoRow ? infoRow.fecha_em : null;
       const estado = infoRow ? infoRow.estado : 'aberta';
+      progListaEstado = estado;
       const porHora = fecha ? (new Date(fecha) <= new Date()) : false;
       const porEstado = (estado === 'registada' || estado === 'terminada');
       const grupoObj = progGrupos.find(x => x.id === progListaGrupo);
@@ -2088,7 +2097,9 @@
       else if (aberta) etiqueta = '<span class="prog-tag-open">POSICAO ABERTA</span>';
       else etiqueta = '<span style="color:var(--muted);font-size:11px;letter-spacing:0.08em">PROGNOSTICO</span>';
 
-      html += '<div class="prog-row' + (euDono ? ' eu' : '') + (editavel ? ' clic' : '') + '"' +
+      const podeMarcar = (progListaEstado === 'registada' || progListaEstado === 'terminada') && souAceite && temDados;
+      const resClass = row.resultado === 'certo' ? ' res-certo' : (row.resultado === 'errado' ? ' res-errado' : '');
+      html += '<div class="prog-row' + (euDono ? ' eu' : '') + (editavel ? ' clic' : '') + resClass + '"' +
               (editavel ? ' onclick="progToggleLinha(' + i + ')"' : '') + '>' +
         '<div class="prog-row-head">' +
           '<div class="prog-row-label">' + etiqueta + '</div>' +
@@ -2103,6 +2114,13 @@
         '</div>';
       } else {
         html += '<div class="prog-vazia">Por preencher</div>';
+      }
+
+      if (podeMarcar && row.id) {
+        html += '<div class="prog-res-btns" onclick="event.stopPropagation()">' +
+                  '<button class="prog-res-btn certo' + (row.resultado==='certo'?' on':'') + '" onclick="progMarcarResultado(' + row.id + ',\'certo\')">\u2713 Acertou</button>' +
+                  '<button class="prog-res-btn errado' + (row.resultado==='errado'?' on':'') + '" onclick="progMarcarResultado(' + row.id + ',\'errado\')">\u2717 Falhou</button>' +
+                '</div>';
       }
 
       if (expandida) {
@@ -2217,6 +2235,22 @@
     } catch (e) { showToast('Erro de ligacao.', 'error'); }
   }
 
+
+  async function progMarcarResultado(prognosticoId, valor) {
+    // toggle: se ja esta nesse valor, limpa
+    const atual = progListaRows.find(r => r.id === prognosticoId);
+    const novo = (atual && atual.resultado === valor) ? null : valor;
+    try {
+      const res = await fetch(SUPABASE_URL + '/rest/v1/prog_prognosticos?id=eq.' + prognosticoId, {
+        method: 'PATCH', headers: Object.assign(progHeaders(), { 'Prefer': 'return=minimal' }),
+        body: JSON.stringify({ resultado: novo })
+      });
+      if (res.ok) {
+        if (atual) atual.resultado = novo;   // atualizar local
+        progRenderDia();
+      } else { showToast('Erro ao marcar.', 'error'); }
+    } catch (e) { showToast('Erro de ligacao.', 'error'); }
+  }
 
   let progNotifEnviadas = {};
   async function progNotificarProgresso() {
