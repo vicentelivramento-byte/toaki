@@ -2170,8 +2170,16 @@
   function progBotoesPrognostico(i, prognostico) {
     const e = progEscolha[i] || progParsePrognostico(prognostico);
     progEscolha[i] = e;
-    let h = '<div class="pg-grp"><div class="pg-lbl">Tipo</div><div class="pg-btns" style="flex-wrap:wrap">';
-    PROG_TIPOS.forEach(t => {
+    let h = '<div class="pg-grp"><div class="pg-lbl">Tipo</div>';
+    // Linha 1: os 4 tipos base
+    h += '<div class="pg-btns" style="margin-bottom:6px">';
+    PROG_TIPOS.slice(0, 4).forEach(t => {
+      h += '<button class="pg-btn' + (e.tipo === t.cod ? ' on' : '') + '" onclick="progEscolherTipo(' + i + ',\'' + t.cod + '\')">' + t.label + '</button>';
+    });
+    h += '</div>';
+    // Linha 2: os 2 tipos novos
+    h += '<div class="pg-btns">';
+    PROG_TIPOS.slice(4).forEach(t => {
       h += '<button class="pg-btn' + (e.tipo === t.cod ? ' on' : '') + '" onclick="progEscolherTipo(' + i + ',\'' + t.cod + '\')">' + t.label + '</button>';
     });
     h += '</div></div>';
