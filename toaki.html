@@ -2141,6 +2141,17 @@
   // Estado da escolha de prognostico por posicao: {tipo, valor}
   let progEscolha = {};
   let progCodigo = {}, progValor = {};
+  // Tipos de aposta e os seus valores possiveis
+  const PROG_TIPOS = [
+    { cod: 'TR',    label: 'TR',    valores: ['1','X','2'] },
+    { cod: 'INT',   label: 'INT',   valores: ['1','X','2'] },
+    { cod: 'DV',    label: 'DV',    valores: ['1','X','2'] },
+    { cod: '+/-',   label: '+/-',   valores: ['+','-'] },
+    { cod: 'AM',    label: 'AMBAS MARCAM',     valores: ['SIM','NAO'] },
+    { cod: 'PM',    label: 'PRIMEIRA A MARCAR', valores: ['1','2'] }
+  ];
+  function progTipoInfo(cod) { return PROG_TIPOS.find(t => t.cod === cod); }
+
   function progParsePrognostico(txt) {
     // aceita "TR 1", "INT X", "DV 2", "+/- +", "+/- -"
     const t = (txt || '').trim().toUpperCase();
@@ -2150,23 +2161,28 @@
     }
     const m = t.match(/^(TR|INT|DV)\s*([1X2])$/);
     if (m) return { tipo: m[1], valor: m[2] };
+    const am = t.match(/^AM\s*(SIM|NAO|N\u00C3O)$/);
+    if (am) return { tipo: 'AM', valor: am[1] === 'N\u00C3O' ? 'NAO' : am[1] };
+    const pm = t.match(/^PM\s*([12])$/);
+    if (pm) return { tipo: 'PM', valor: pm[1] };
     return { tipo: '', valor: '' };
   }
   function progBotoesPrognostico(i, prognostico) {
     const e = progEscolha[i] || progParsePrognostico(prognostico);
     progEscolha[i] = e;
-    const tipos = ['TR', 'INT', 'DV', '+/-'];
-    let h = '<div class="pg-grp"><div class="pg-lbl">Tipo</div><div class="pg-btns">';
-    tipos.forEach(tp => {
-      h += '<button class="pg-btn' + (e.tipo === tp ? ' on' : '') + '" onclick="progEscolherTipo(' + i + ',\'' + tp + '\')">' + tp + '</button>';
+    let h = '<div class="pg-grp"><div class="pg-lbl">Tipo</div><div class="pg-btns" style="flex-wrap:wrap">';
+    PROG_TIPOS.forEach(t => {
+      h += '<button class="pg-btn' + (e.tipo === t.cod ? ' on' : '') + '" onclick="progEscolherTipo(' + i + ',\'' + t.cod + '\')">' + t.label + '</button>';
     });
     h += '</div></div>';
     // valores dependem do tipo
-    const valores = e.tipo === '+/-' ? ['+', '-'] : (e.tipo ? ['1', 'X', '2'] : []);
+    const info = progTipoInfo(e.tipo);
+    const valores = info ? info.valores : [];
     if (valores.length) {
       h += '<div class="pg-grp"><div class="pg-lbl">Prognostico</div><div class="pg-btns">';
       valores.forEach(v => {
-        h += '<button class="pg-btn' + (e.valor === v ? ' on' : '') + '" onclick="progEscolherValor(' + i + ',\'' + v + '\')">' + v + '</button>';
+        const vlabel = v === 'NAO' ? 'N\u00C3O' : v;
+        h += '<button class="pg-btn' + (e.valor === v ? ' on' : '') + '" onclick="progEscolherValor(' + i + ',\'' + v + '\')">' + vlabel + '</button>';
       });
       h += '</div></div>';
     }
