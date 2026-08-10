@@ -788,6 +788,15 @@
     updateSelectedLocLabel();
     if (!fromRegister) initLocation();
 
+    // Link com data: ?lista=ID&data=YYYY-MM-DD abre direto os prognosticos dessa data
+    try {
+      const qp = new URLSearchParams(location.search);
+      const lid = parseInt(qp.get('lista'), 10) || null;
+      const ldata = qp.get('data');
+      if (lid && ldata) {
+        setTimeout(() => { switchNav('prognostico'); setTimeout(() => progAbrirPrognosticos(lid, ldata), 600); }, 300);
+      }
+    } catch (e) {}
     // Link partilhado: ?lista=ID abre direto no separador Prognostico
     try {
       if (new URLSearchParams(location.search).get('lista')) setTimeout(() => switchNav('prognostico'), 300);
@@ -2014,12 +2023,15 @@
   // ===== LISTAS DIARIAS DE PROGNOSTICOS =====
   let progListaGrupo = null, progListaId = null, progListaRows = [], progListaFechada = false, progLinhaAberta = null, progListaEstado = 'aberta';
 
-  function progAbrirPrognosticos(grupoId) {
+  function progAbrirPrognosticos(grupoId, dataIso) {
     progListaGrupo = grupoId;
     const g = progGrupos.find(x => x.id === grupoId);
     document.getElementById('progListaTitulo').textContent = g ? g.nome : 'Lista';
-    const hoje = new Date();
-    const iso = new Date(hoje.getTime() - hoje.getTimezoneOffset() * 60000).toISOString().slice(0, 10);
+    let iso = dataIso;
+    if (!iso) {
+      const hoje = new Date();
+      iso = new Date(hoje.getTime() - hoje.getTimezoneOffset() * 60000).toISOString().slice(0, 10);
+    }
     document.getElementById('progDataInput').value = iso;
     document.getElementById('prognosticosOverlay').classList.add('open');
     progCarregarDia();
@@ -2304,7 +2316,7 @@
         const d = new Date(infoRow.fecha_em);
         limiteTxt = d.toLocaleDateString('pt-PT') + ' ' + d.toLocaleTimeString('pt-PT', { hour: '2-digit', minute: '2-digit' });
       }
-      const viewUrl = BASE_URL + 'toaki.html?lista=' + grupoId;
+      const viewUrl = BASE_URL + 'toaki.html?lista=' + grupoId + (dataLista ? '&data=' + dataLista : '');
 
       // enviar a cada participante que AINDA NAO preencheu (e nao a mim)
       const myId = currentUser?.id || null;
