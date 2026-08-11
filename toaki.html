@@ -2062,7 +2062,8 @@
       const fecha = infoRow ? infoRow.fecha_em : null;
       const estado = infoRow ? infoRow.estado : 'aberta';
       progListaEstado = estado;
-      const porHora = fecha ? (new Date(fecha) <= new Date()) : false;
+      const reaberta = !!(infoRow && infoRow.reaberta);
+      const porHora = (fecha && !reaberta) ? (new Date(fecha) <= new Date()) : false;
       const porEstado = (estado === 'registada' || estado === 'terminada');
       const grupoObj = progGrupos.find(x => x.id === progListaGrupo);
       const grupoFechado = !!(grupoObj && grupoObj.fechada);
@@ -2074,13 +2075,30 @@
       } else if (fecha) {
         const d = new Date(fecha);
         const txt = d.toLocaleDateString('pt-PT') + ' as ' + d.toLocaleTimeString('pt-PT', { hour: '2-digit', minute: '2-digit' });
-        el.textContent = porHora ? 'Lista fechada desde ' + txt : 'Fecha a ' + txt;
+        el.textContent = porHora ? 'Lista fechada desde ' + txt : (reaberta ? 'Reaberta pelo admin (fechava ' + txt + ')' : 'Fecha a ' + txt);
         el.className = 'prog-fecho' + (porHora ? ' fechada' : '');
       } else { el.textContent = ''; }
+      // Botao admin: reabrir/fechar a lista (quando o fecho e' por hora)
+      const jaFechouPorHora = fecha ? (new Date(fecha) <= new Date()) : false;
+      if (progIsAdmin && jaFechouPorHora && !porEstado) {
+        const btnTxt = reaberta ? 'Fechar novamente' : 'Reabrir para edicao';
+        el.innerHTML += '<button class="prog-btn-sm" style="margin-top:8px;display:block;width:100%" onclick="progReabrirLista(' + progListaId + ',' + (reaberta ? 'false' : 'true') + ')">' + btnTxt + '</button>';
+      }
       progRenderDia();
     } catch (e) {
       body.innerHTML = '<div class="prog-empty">Erro de ligacao.</div>';
     }
+  }
+
+  async function progReabrirLista(listaId, reabrir) {
+    try {
+      const res = await fetch(SUPABASE_URL + '/rest/v1/prog_listas?id=eq.' + listaId, {
+        method: 'PATCH', headers: Object.assign(progHeaders(), { 'Prefer': 'return=minimal' }),
+        body: JSON.stringify({ reaberta: reabrir })
+      });
+      if (res.ok) { showToast(reabrir ? '\u2713 Lista reaberta.' : '\u2713 Lista fechada.', 'success'); progCarregarDia(); }
+      else { showToast('Erro.', 'error'); }
+    } catch (e) { showToast('Erro de ligacao.', 'error'); }
   }
 
   function progToggleLinha(i) {
