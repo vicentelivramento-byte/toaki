@@ -1742,6 +1742,22 @@
       progGrupos = Array.isArray(gr) ? gr : [];
       progParts = Array.isArray(pr) ? pr : [];
       progHodes = Array.isArray(hd) ? hd : [];
+
+      // --- Conta corrente do participante: registadas/terminadas + movimentos das MINHAS listas ---
+      try {
+        const myId = currentUser?.id || null;
+        const meusG = myId ? [...new Set(progParts.filter(p => p.user_id === myId).map(p => p.grupo_id))] : [];
+        if (meusG.length) {
+          const inList = '(' + meusG.join(',') + ')';
+          const [regMinhas, movMinhas] = await Promise.all([
+            fetch(SUPABASE_URL + '/rest/v1/prog_listas?grupo_id=in.' + inList + '&estado=in.(registada,terminada)&select=*,prog_grupos(nome)&order=data.desc', { headers: progHeaders() }).then(r => r.json()).catch(() => []),
+            fetch(SUPABASE_URL + '/rest/v1/prog_movimentos?grupo_id=in.' + inList + '&select=*&order=created_at.desc&limit=200', { headers: progHeaders() }).then(r => r.json()).catch(() => [])
+          ]);
+          progMinhasRegistadas = Array.isArray(regMinhas) ? regMinhas : [];
+          progMinhasMovs = Array.isArray(movMinhas) ? movMinhas : [];
+        } else { progMinhasRegistadas = []; progMinhasMovs = []; }
+      } catch (e) { progMinhasRegistadas = []; progMinhasMovs = []; }
+
       if (progIsAdmin) {
         const [prt, reg] = await Promise.all([
           fetch(SUPABASE_URL + '/rest/v1/prog_prontas?select=*&order=data.asc', { headers: progHeaders() }).then(r => r.json()).catch(() => []),
@@ -1773,6 +1789,7 @@
   let progGrupoExpandido = null;
   let progBuscaAberta = false;
   let progCasaSaldo = 0, progCasaMovs = [], progCCtab = 'listas';
+  let progMinhasRegistadas = [], progMinhasMovs = [], progCCparticipante = false;
   let progInfoAberto = '';
   // configura aqui as instrucoes de pagamento MB WAY (numero/chave a preencher)
   const MBWAY_INFO = 'Numero MB WAY: 963 972 914';
@@ -1842,6 +1859,11 @@
       meusGrupos.forEach(gid => { html += progGrupoCard(gid, true); });
     } else {
       html += '<div class="prog-empty">Ainda nao ocupas nenhuma posicao.<br>Cria uma lista ou procura uma disponivel.</div>';
+    }
+
+    // ----- Conta corrente do participante (so' se nao for admin e tiver listas) -----
+    if (!progIsAdmin && meusGrupos.length) {
+      html += progContaCorrenteParticipante(meusGrupos);
     }
 
     // ----- Procurar listas disponiveis (com posicoes livres) -----
@@ -2524,6 +2546,50 @@
   function progComoPagar() {
     const nome = userName || 'o teu nome';
     alert('COMO PAGAR (MB WAY)\n\n' + MBWAY_INFO + '\n\nValor: 20\u20AC por posicao.\n\nIMPORTANTE: nas observacoes do pagamento escreve o teu nome: "' + nome + '"\n\nApos o pagamento, a administracao aceita a tua posicao.');
+  }
+
+  function progContaCorrenteParticipante(meusGrupos) {
+    let h = '<div class="prog-card" style="margin-top:8px">';
+    h += '<div class="prog-card-title" style="margin-bottom:10px">A minha conta corrente</div>';
+    h += '<div style="display:flex;gap:6px;margin-bottom:12px">' +
+           '<button class="pg-btn' + (progCCtab==='listas'?' on':'') + '" style="flex:1" onclick="progCCtab=\'listas\';renderProg()">Listas</button>' +
+           '<button class="pg-btn' + (progCCtab==='movs'?' on':'') + '" style="flex:1" onclick="progCCtab=\'movs\';renderProg()">Movimentos</button>' +
+         '</div>';
+
+    if (progCCtab === 'movs') {
+      // saldo das minhas listas + movimentos
+      let total = 0;
+      (progGrupos || []).forEach(g => { if (meusGrupos.indexOf(g.id) >= 0) total += Number(g.creditos || 0); });
+      h += '<div class="prog-badge" style="width:100%;margin-bottom:10px"><div class="prog-badge-val">' + progFmt(total) + '\u20AC</div><div class="prog-badge-lbl">Saldo das minhas listas</div></div>';
+      if (!progMinhasMovs.length) h += '<div class="prog-sub">Sem movimentos.</div>';
+      else progMinhasMovs.forEach(m => {
+        const v = Number(m.valor || 0); const ent = v >= 0;
+        const g = (progGrupos || []).find(x => x.id === m.grupo_id);
+        const nomes = { carregamento: 'Posicao aceite', registo: 'Registo da aposta', resultado: 'Ganhos', levantamento: 'Recebido' };
+        h += '<div class="prog-pos" style="margin-top:6px">' +
+               '<div class="prog-pos-name" style="font-size:13px">' + (nomes[m.tipo] || m.tipo) +
+                 '<div class="prog-sub">' + (g ? g.nome + ' \u00B7 ' : '') + (m.created_at ? m.created_at.substring(0,10) : '') + '</div></div>' +
+               '<div class="prog-pos-tag" style="color:' + (ent?'#1a7a3f':'var(--red)') + ';font-family:\'Syne\',sans-serif;font-weight:800">' + (ent?'+':'') + progFmt(v) + '\u20AC</div>' +
+             '</div>';
+      });
+    } else {
+      // listas registadas/terminadas das minhas listas (para consulta)
+      if (!progMinhasRegistadas.length) h += '<div class="prog-sub">Ainda nao ha listas registadas.</div>';
+      else progMinhasRegistadas.forEach(l => {
+        const nome = (l.prog_grupos && l.prog_grupos.nome) ? l.prog_grupos.nome : 'Lista';
+        const estadoTxt = l.estado === 'terminada' ? 'Terminada' : 'Registada';
+        const valTxt = l.estado === 'terminada'
+          ? (l.valor_ganhos != null ? 'Ganhos: ' + progFmt(l.valor_ganhos) + '\u20AC' : '')
+          : (l.valor_registo != null ? 'Registo: ' + progFmt(l.valor_registo) + '\u20AC' : '');
+        h += '<div class="prog-pos" style="margin-top:8px;cursor:pointer" onclick="verListaPronta(' + l.id + ',\'' + nome.replace(/'/g,'') + '\',\'' + (l.data||'') + '\')">' +
+               '<div class="prog-pos-name">' + nome +
+                 '<div class="prog-sub">' + (l.data||'') + ' \u00B7 ' + estadoTxt + (valTxt ? ' \u00B7 ' + valTxt : '') + '</div></div>' +
+               '<div class="prog-pos-tag" style="color:var(--red)">Ver</div>' +
+             '</div>';
+      });
+    }
+    h += '</div>';
+    return h;
   }
 
   function progContaCorrente() {
