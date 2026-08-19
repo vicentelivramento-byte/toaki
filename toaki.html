@@ -2195,43 +2195,58 @@
   let progCodigo = {}, progValor = {};
   // Tipos de aposta e os seus valores possiveis
   const PROG_TIPOS = [
-    { cod: 'TR',    label: 'TR',    valores: ['1','X','2'] },
-    { cod: 'INT',   label: 'INT',   valores: ['1','X','2'] },
-    { cod: 'DV',    label: 'DV',    valores: ['1','X','2'] },
-    { cod: '+/-',   label: '+/-',   valores: ['+','-'] },
-    { cod: 'AM',    label: 'AMBAS MARCAM',     valores: ['SIM','NAO'] },
-    { cod: 'PM',    label: 'PRIMEIRA A MARCAR', valores: ['1','2'] }
+    { cod: 'TR',     label: 'TR',              valores: ['1','X','2'] },
+    { cod: 'INT',    label: 'INT',             valores: ['1','X','2'] },
+    { cod: 'DVTR',   label: 'DV TR',           valores: ['1','X','2'] },
+    { cod: 'DVINT',  label: 'DV INT',          valores: ['1','X','2'] },
+    { cod: 'GTR',    label: '+/- TR',          valores: ['+','-'] },
+    { cod: 'GINT',   label: '+/- INT',         valores: ['+','-'] },
+    { cod: 'AM',     label: 'AMBAS MARCAM',    valores: ['SIM','NAO'] },
+    { cod: 'PMTR',   label: '1a A MARCAR TR',  valores: ['1','2'] },
+    { cod: 'PMINT',  label: '1a A MARCAR INT', valores: ['1','2'] }
   ];
   function progTipoInfo(cod) { return PROG_TIPOS.find(t => t.cod === cod); }
 
   function progParsePrognostico(txt) {
-    // aceita "TR 1", "INT X", "DV 2", "+/- +", "+/- -"
-    const t = (txt || '').trim().toUpperCase();
+    let t = (txt || '').trim().toUpperCase();
     if (!t) return { tipo: '', valor: '' };
-    if (t.startsWith('+/-') || t.startsWith('+/\u2212')) {
-      return { tipo: '+/-', valor: t.indexOf('-') > 2 || t.indexOf('\u2212') > 2 ? '-' : '+' };
+    // Formato novo direto: "<COD> <VALOR>" onde COD e' um dos PROG_TIPOS
+    const dm = t.match(/^(DVTR|DVINT|GTR|GINT|PMTR|PMINT|TR|INT|AM)\s+(.+)$/);
+    if (dm) {
+      const info = PROG_TIPOS.find(x => x.cod === dm[1]);
+      let v = dm[2].trim();
+      if (v === 'N\u00C3O') v = 'NAO';
+      if (info && info.valores.indexOf(v) >= 0) return { tipo: dm[1], valor: v };
     }
-    const m = t.match(/^(TR|INT|DV)\s*([1X2])$/);
+    // Compatibilidade com formato antigo:
+    //   "DV 1" -> "DVTR 1" ; "+/- +" -> "GTR +" ; "PM 1" -> "PMTR 1"
+    // 1a/marca: +/-
+    let mG = t.match(/^\+\/[-\u2212]\s*(TR|INT)?\s*([+\-\u2212])$/);
+    if (mG) {
+      const sub = mG[1] === 'INT' ? 'GINT' : 'GTR';
+      return { tipo: sub, valor: (mG[2] === '+' ? '+' : '-') };
+    }
+    // DV com sub-tipo opcional
+    let mDV = t.match(/^DV\s*(TR|INT)?\s*([1X2])$/);
+    if (mDV) return { tipo: (mDV[1] === 'INT' ? 'DVINT' : 'DVTR'), valor: mDV[2] };
+    // Primeira a marcar com sub-tipo opcional (PM ou 1A)
+    let mPM = t.match(/^(?:PM|1A)\s*(TR|INT)?\s*([12])$/);
+    if (mPM) return { tipo: (mPM[1] === 'INT' ? 'PMINT' : 'PMTR'), valor: mPM[2] };
+    // TR / INT simples
+    let m = t.match(/^(TR|INT)\s*([1X2])$/);
     if (m) return { tipo: m[1], valor: m[2] };
-    const am = t.match(/^AM\s*(SIM|NAO|N\u00C3O)$/);
+    // Ambas marcam
+    let am = t.match(/^AM\s*(SIM|NAO|N\u00C3O)$/);
     if (am) return { tipo: 'AM', valor: am[1] === 'N\u00C3O' ? 'NAO' : am[1] };
-    const pm = t.match(/^PM\s*([12])$/);
-    if (pm) return { tipo: 'PM', valor: pm[1] };
     return { tipo: '', valor: '' };
   }
   function progBotoesPrognostico(i, prognostico) {
     const e = progEscolha[i] || progParsePrognostico(prognostico);
     progEscolha[i] = e;
     let h = '<div class="pg-grp"><div class="pg-lbl">Tipo</div>';
-    // Linha 1: os 4 tipos base
-    h += '<div class="pg-btns" style="margin-bottom:6px">';
-    PROG_TIPOS.slice(0, 4).forEach(t => {
-      h += '<button class="pg-btn' + (e.tipo === t.cod ? ' on' : '') + '" onclick="progEscolherTipo(' + i + ',\'' + t.cod + '\')">' + t.label + '</button>';
-    });
-    h += '</div>';
-    // Linha 2: os 2 tipos novos
-    h += '<div class="pg-btns">';
-    PROG_TIPOS.slice(4).forEach(t => {
+    // Grelha: TR/INT/DV base numa linha, depois os sub-tipos
+    h += '<div class="pg-btns" style="display:grid;grid-template-columns:repeat(3,1fr);gap:6px">';
+    PROG_TIPOS.forEach(t => {
       h += '<button class="pg-btn' + (e.tipo === t.cod ? ' on' : '') + '" onclick="progEscolherTipo(' + i + ',\'' + t.cod + '\')">' + t.label + '</button>';
     });
     h += '</div></div>';
