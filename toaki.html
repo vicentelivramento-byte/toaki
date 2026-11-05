@@ -2133,14 +2133,16 @@
 
   function progRenderDia() {
     const myPhone = progMyPhone();
-    const souAceite = progParts.some(p => p.grupo_id === progListaGrupo && normalizePhone(p.phone) === myPhone && p.estado === 'aceite');
+    const myId = currentUser?.id || null;
+    const ehEu = (p) => (myId && p.user_id === myId) || (myPhone && normalizePhone(p.phone) === myPhone);
+    const souAceite = progParts.some(p => p.grupo_id === progListaGrupo && ehEu(p) && p.estado === 'aceite');
     const gDia = progGrupos.find(x => x.id === progListaGrupo);
     const NPdia = progNumPos(gDia);
     let html = '';
     for (let i = 1; i <= NPdia; i++) {  // nº de jogos = nº de posicoes da lista
       const row = progListaRows.find(r => r.posicao === i) || { posicao: i };
       const part = progParts.find(p => p.grupo_id === progListaGrupo && p.posicao === i && p.estado === 'aceite');
-      const euDono = part && normalizePhone(part.phone) === myPhone;
+      const euDono = part && ehEu(part);
       const aberta = part && part.aberta === true;
       const editavel = souAceite && !progListaFechada && (euDono || aberta);
       const expandida = progLinhaAberta === i && editavel;
